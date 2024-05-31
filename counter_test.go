@@ -6,7 +6,6 @@ import (
 )
 
 func TestLastUpdate_UnmarshalJSON(t *testing.T) {
-	// Prepare the test cases
 	testCases := []struct {
 		name     string
 		input    string

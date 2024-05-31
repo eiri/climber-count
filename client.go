@@ -2,51 +2,83 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
-	"os"
+	"net/http"
 	"strings"
 	"unicode"
 
 	"golang.org/x/net/html"
 )
 
+const USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type Client struct {
-	url string
+	req    *http.Request
+	client HTTPClient
 }
 
-func NewClient(url string) *Client {
-	return &Client{
-		url: url,
-	}
-}
-
-func (c *Client) Counters() *Counters {
-	file, err := os.Open(c.url)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	doc, err := html.Parse(file)
+func NewClient(uid, fid string) *Client {
+	url := fmt.Sprintf("https://portal.rockgympro.com/portal/public/%s/occupancy?iframeid=occupancyCounter&fId=%s", uid, fid)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return parse(doc)
+	req.Header.Set("Accept", "text/html")
+	req.Header.Set("User-Agent", USER_AGENT)
+
+	return &Client{req, &http.Client{}}
 }
 
-func parse(n *html.Node) (counters *Counters) {
+func (c *Client) Counters() (*Counters, error) {
+	counters := NewCounters()
+
+	body, err := c.fetch()
+	if err != nil {
+		return counters, err
+	}
+	defer body.Close()
+
+	doc, err := html.Parse(body)
+	if err != nil {
+		return counters, err
+	}
+
+	data := parse(doc)
+
+	err = json.Unmarshal([]byte(data), counters)
+
+	return counters, err
+}
+
+func (c *Client) fetch() (io.ReadCloser, error) {
+	resp, err := c.client.Do(c.req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("failed to fetch URL: %s, status: %d", c.req.RequestURI, resp.StatusCode)
+	}
+
+	return resp.Body, nil
+}
+
+func parse(n *html.Node) (data string) {
 	if n.Type == html.TextNode && strings.Contains(n.Data, "var data = ") {
-		data := extract(n.Data)
-		counters = NewCounters()
-		if err := json.Unmarshal([]byte(data), counters); err != nil {
-			log.Fatal(err)
-		}
+		data = extract(n.Data)
 		return
 	}
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if cn := parse(c); cn != nil {
-			counters = cn
+		if d := parse(c); d != "" {
+			data = d
 			break
 		}
 	}
