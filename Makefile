@@ -14,6 +14,10 @@ occupancy.html:
 .PHONY: build
 build: $(PROJECT)
 
+.PHONY: test
+test:
+	go test -v ./...
+
 .PHONY: run
 run: $(PROJECT) occupancy.html
 	./$< -gym SBL
