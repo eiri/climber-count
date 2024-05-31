@@ -1,0 +1,4 @@
+*.html
+.env
+/climber-count
+dist/
