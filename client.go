@@ -23,8 +23,8 @@ type Client struct {
 	client HTTPClient
 }
 
-func NewClient(uid, fid string) *Client {
-	url := fmt.Sprintf("https://portal.rockgympro.com/portal/public/%s/occupancy?iframeid=occupancyCounter&fId=%s", uid, fid)
+func NewClient(pgk, fid string) *Client {
+	url := fmt.Sprintf("https://portal.rockgympro.com/portal/public/%s/occupancy?iframeid=occupancyCounter&fId=%s", pgk, fid)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.Fatal(err)

@@ -4,7 +4,7 @@ Scrapes the rockgympro.com climber count gauge.
 
 ## How it works
 
-- Pulls html from rockgympro.com for a given uid and fId.
+- Pulls html from rockgympro.com for a given pgk and fId.
 - Parses the html file, extracts `var data` as JSON.
 - Gets a counter for a given gym and stores it and update time in csv file.
 - If the count is less than a given theashold sends a message through a Telegram bot.
@@ -14,7 +14,7 @@ To use set the cli in crontab for desired timeframes. Play nicely and don't spam
 
 ### Config
 
-Pass URL's uid and fID plus name of the gym either as flags or environment variables.
+Pass URL's pgk and fID plus name of the gym either as flags or environment variables.
 
 ```bash
 $ ./climber-count --help
@@ -23,8 +23,8 @@ Usage of ./climber-count:
     	URL's fId. (Defaults to env var CC_FID)
   -gym string
     	Gym  name. (Defaults to env var CC_GYM)
-  -uid string
-    	URL's uid. (Defaults to env var CC_UID)
+  -pgk string
+    	URL's pgk. (Defaults to env var CC_PGK)
 ```
 
 For dev just create `.env` file with those vars and Makefile pass them to run.

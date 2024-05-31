@@ -7,11 +7,10 @@ import (
 	"os"
 )
 
-var fid, uid, gym string
+var pgk, fid, gym string
 
 func init() {
-	// pgk
-	flag.StringVar(&uid, "uid", os.Getenv("CC_UID"), "URL's uid. (Defaults to env var CC_UID)")
+	flag.StringVar(&pgk, "pgk", os.Getenv("CC_PGK"), "URL's pgk. (Defaults to env var CC_PGK)")
 	flag.StringVar(&fid, "fid", os.Getenv("CC_FID"), "URL's fId. (Defaults to env var CC_FID)")
 	flag.StringVar(&gym, "gym", os.Getenv("CC_GYM"), "Gym  name. (Defaults to env var CC_GYM)")
 }
@@ -19,7 +18,7 @@ func init() {
 func main() {
 	flag.Parse()
 
-	client := NewClient(uid, fid)
+	client := NewClient(pgk, fid)
 	counters, err := client.Counters()
 
 	if err != nil {
