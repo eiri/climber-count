@@ -1,3 +1,4 @@
 .env
+*.csv
 /climber-count
 dist/
