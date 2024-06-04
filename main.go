@@ -46,16 +46,24 @@ func main() {
 
 	client := NewClient(pgk, fid)
 	counters, err := client.Counters()
-
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if storage == "" {
-		fmt.Printf("Currenly %d people on the wall\n", counters.Counter(gym).Count)
-	} else {
+	counter := counters.Counter(gym)
+
+	if storage != "" {
 		storage := NewStorage(storage)
-		storage.Store(counters.Counter(gym))
+		err := storage.Store(counter)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if c, ok := storage.Last(); ok {
+			counter = c
+		}
 	}
+
+	fmt.Printf("%d people on the wall\n", counter.Count)
+
 	os.Exit(0)
 }

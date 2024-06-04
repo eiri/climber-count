@@ -155,3 +155,59 @@ func TestStore_Deduplication(t *testing.T) {
 		t.Errorf("expected records %v but got %v", expectedRecords, records)
 	}
 }
+
+func TestLast(t *testing.T) {
+	filePath := "test_storage.csv"
+	os.Remove(filePath)       // Ensure the file does not exist before testing
+	defer os.Remove(filePath) // Clean up after test
+
+	st := NewStorage(filePath)
+
+	counter1 := Counter{
+		Count:    1,
+		Capacity: 100,
+		LastUpdate: LastUpdate{
+			Time: time.Date(2024, time.May, 30, 10, 0, 0, 0, time.UTC),
+		},
+	}
+
+	counter2 := Counter{
+		Count:    2,
+		Capacity: 200,
+		LastUpdate: LastUpdate{
+			Time: time.Date(2024, time.May, 30, 11, 0, 0, 0, time.UTC),
+		},
+	}
+
+	if err := st.Store(counter1); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if err := st.Store(counter2); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lastCounter, ok := st.Last()
+	if !ok {
+		t.Fatalf("expected last counter to be found")
+	}
+
+	expectedCounter := counter2
+
+	if !reflect.DeepEqual(lastCounter, expectedCounter) {
+		t.Errorf("expected last counter %v but got %v", expectedCounter, lastCounter)
+	}
+}
+
+func TestLast_EmptyStorage(t *testing.T) {
+	filePath := "test_empty_storage.csv"
+	os.Remove(filePath)       // Ensure the file does not exist before testing
+	defer os.Remove(filePath) // Clean up after test
+
+	st := NewStorage(filePath)
+
+	_, ok := st.Last()
+	if ok {
+		t.Fatalf("expected no last counter in empty storage")
+	}
+}
