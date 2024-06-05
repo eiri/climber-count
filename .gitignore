@@ -1,4 +1,6 @@
 .env
 *.csv
+*.md
+!README.md
 /climber-count
 dist/

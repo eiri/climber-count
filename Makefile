@@ -17,7 +17,7 @@ test:
 
 .PHONY: run
 run: $(PROJECT)
-	./$< -gym SBL -storage sbl.csv
+	./$<
 
 .PHONY: clean
 clean:
