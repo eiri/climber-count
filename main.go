@@ -1,9 +1,13 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
 	"os"
+	"os/signal"
+
+	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
 )
 
 func main() {
@@ -12,31 +16,22 @@ func main() {
 		log.Fatal(err)
 	}
 
-	client := NewClient(cfg.PGK, cfg.FID)
-	counters, err := client.Counters()
-	if err != nil {
+	bt := NewBot(cfg)
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	opts := []bot.Option{
+		// just no-op
+		bot.WithDefaultHandler(func(ctx context.Context, b *bot.Bot, update *models.Update) {}),
+	}
+
+	b, err := bot.New(cfg.BotToken, opts...)
+	if nil != err {
 		log.Fatal(err)
 	}
 
-	counter := counters.Counter(cfg.Gym)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/count", bot.MatchTypeExact, bt.Handler)
 
-	if cfg.Storage != "" {
-		storage := NewStorage(cfg.Storage)
-		err := storage.Store(counter)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if c, ok := storage.Last(); ok {
-			counter = c
-		}
-	}
-
-	switch count := counter.Count; count {
-	case 1:
-		fmt.Println("One person on the wall")
-	default:
-		fmt.Printf("%d people on the wall\n", count)
-	}
-
-	os.Exit(0)
+	b.Start(ctx)
 }

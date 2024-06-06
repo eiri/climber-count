@@ -190,7 +190,11 @@ func TestFetch(t *testing.T) {
 				err:  tt.mockError,
 			}
 
-			client := NewClient("pgk", "fid")
+			cfg := &Config{
+				PGK: "pgk",
+				FID: "fid",
+			}
+			client := NewClient(cfg)
 			client.client = mockClient
 
 			body, err := client.fetch()

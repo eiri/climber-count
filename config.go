@@ -6,19 +6,21 @@ import (
 )
 
 type Config struct {
-	PGK     string
-	FID     string
-	Gym     string
-	Storage string
+	PGK      string
+	FID      string
+	Gym      string
+	BotToken string
+	Storage  string
 }
 
 func NewConfig() (*Config, error) {
 	cfg := Config{}
 	envVars := map[string]*string{
-		"PGK":     &cfg.PGK,
-		"FID":     &cfg.FID,
-		"GYM":     &cfg.Gym,
-		"STORAGE": &cfg.Storage,
+		"PGK":       &cfg.PGK,
+		"FID":       &cfg.FID,
+		"GYM":       &cfg.Gym,
+		"BOT_TOKEN": &cfg.BotToken,
+		"STORAGE":   &cfg.Storage,
 	}
 
 	for key, ptr := range envVars {

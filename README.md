@@ -1,33 +1,13 @@
 # Climber Count
 
-Scrapes the rockgympro.com climber count gauge.
+This is a Telegram bot that scrapes the rockgympro.com climber count gauge for a given gym and returns the lates people count to a channel when asked.
 
 ## How it works
 
-- Pulls html from rockgympro.com for a given pgk and fId.
+- Periodically pulls html from rockgympro.com for a given pgk and fId.
 - Parses the html file, extracts `var data` as JSON.
 - Gets a counter for a given gym and stores it and update time in csv file.
-- If the count is less than a given theashold sends a message through a Telegram bot.
-- Implements a webhook for the Telegram bot to answer a question "How many on the wall"?
-
-To use set the cli in crontab for desired timeframes. Play nicely and don't spam URL with requests, once in quater of an hour sure should be enough.
-
-### Config
-
-Pass URL's pgk and fID plus name of the gym either as flags or environment variables.
-
-```bash
-$ ./climber-count --help
-Usage of ./climber-count:
-  -fid string
-    	URL's fId. (Defaults to env var CC_FID)
-  -gym string
-    	Gym  name. (Defaults to env var CC_GYM)
-  -pgk string
-    	URL's pgk. (Defaults to env var CC_PGK)
-```
-
-For dev just create `.env` file with those vars and Makefile pass them to run.
+- When bot asked for /count returns the latest count from the storage.
 
 ## Licence
 

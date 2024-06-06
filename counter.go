@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
 	"time"
 )
@@ -19,6 +20,14 @@ type Counter struct {
 	Count      int        `json:"count"`
 	Capacity   int        `json:"capacity"`
 	LastUpdate LastUpdate `json:"lastUpdate"`
+}
+
+func (c Counter) String() string {
+	msg := "One person on the wall"
+	if c.Count > 1 {
+		msg = fmt.Sprintf("%d people on the wall", c.Count)
+	}
+	return msg
 }
 
 var re = regexp.MustCompile(`\d{1,}:\d{2}[AP]M`)

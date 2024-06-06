@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -73,6 +74,26 @@ func TestLastUpdate_UnmarshalJSON(t *testing.T) {
 				if !lu.Equal(tc.expected) {
 					t.Errorf("expected %v but got %v", tc.expected, lu)
 				}
+			}
+		})
+	}
+}
+
+func TestCounter_String(t *testing.T) {
+	tests := []struct {
+		counter Counter
+		want    string
+	}{
+		{Counter{Count: 1}, "One person on the wall"},
+		{Counter{Count: 2}, "2 people on the wall"},
+		{Counter{Count: 0}, "One person on the wall"}, // Assuming the default message for zero is "One person on the wall"
+		{Counter{Count: 100}, "100 people on the wall"},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("Count=%d", tt.counter.Count), func(t *testing.T) {
+			if got := tt.counter.String(); got != tt.want {
+				t.Errorf("Counter.String() = %v, want %v", got, tt.want)
 			}
 		})
 	}

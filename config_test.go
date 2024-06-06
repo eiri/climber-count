@@ -19,10 +19,11 @@ func unsetEnvVars(envVars map[string]string) {
 
 func TestNewConfig_AllVarsSet(t *testing.T) {
 	envVars := map[string]string{
-		"PGK":     "pgk_value",
-		"FID":     "fid_value",
-		"GYM":     "gym_value",
-		"STORAGE": "storage_value",
+		"PGK":       "pgk_value",
+		"FID":       "fid_value",
+		"GYM":       "gym_value",
+		"BOT_TOKEN": "bot_token_value",
+		"STORAGE":   "storage_value",
 	}
 	setEnvVars(envVars)
 	defer unsetEnvVars(envVars)
@@ -40,6 +41,9 @@ func TestNewConfig_AllVarsSet(t *testing.T) {
 	}
 	if cfg.Gym != envVars["GYM"] {
 		t.Errorf("expected GYM %q, got %q", envVars["GYM"], cfg.Gym)
+	}
+	if cfg.BotToken != envVars["BOT_TOKEN"] {
+		t.Errorf("expected BOT_TOKEN %q, got %q", envVars["BOT_TOKEN"], cfg.BotToken)
 	}
 	if cfg.Storage != envVars["STORAGE"] {
 		t.Errorf("expected STORAGE %q, got %q", envVars["STORAGE"], cfg.Storage)
@@ -66,9 +70,10 @@ func TestNewConfig_RequiredVarsNotSet(t *testing.T) {
 
 func TestNewConfig_OptionalVarNotSet(t *testing.T) {
 	envVars := map[string]string{
-		"PGK": "pgk_value",
-		"FID": "fid_value",
-		"GYM": "gym_value",
+		"PGK":       "pgk_value",
+		"FID":       "fid_value",
+		"GYM":       "gym_value",
+		"BOT_TOKEN": "bot_token_value",
 	}
 	setEnvVars(envVars)
 	defer unsetEnvVars(envVars)
@@ -86,6 +91,9 @@ func TestNewConfig_OptionalVarNotSet(t *testing.T) {
 	}
 	if cfg.Gym != envVars["GYM"] {
 		t.Errorf("expected GYM %q, got %q", envVars["GYM"], cfg.Gym)
+	}
+	if cfg.BotToken != envVars["BOT_TOKEN"] {
+		t.Errorf("expected BOT_TOKEN %q, got %q", envVars["BOT_TOKEN"], cfg.BotToken)
 	}
 	if cfg.Storage != "" {
 		t.Errorf("expected STORAGE to be empty, got %q", cfg.Storage)
