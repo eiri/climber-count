@@ -98,3 +98,31 @@ func TestCounter_String(t *testing.T) {
 		})
 	}
 }
+
+func TestNewCounters(t *testing.T) {
+	counters := NewCounters()
+	if counters == nil {
+		t.Fatal("expected non-nil Counters")
+	}
+	if len(*counters) != 0 {
+		t.Fatalf("expected empty Counters map, got size %d", len(*counters))
+	}
+}
+
+func TestCounters_Counter(t *testing.T) {
+	gymName := "GymA"
+	expectedTime, _ := time.Parse("2006-01-02", "2024-05-30")
+	expectedCounter := Counter{Count: 10, Capacity: 50, LastUpdate: LastUpdate{Time: expectedTime}}
+	counters := &Counters{"GymA": expectedCounter}
+
+	retrievedCounter := counters.Counter(gymName)
+	if retrievedCounter != expectedCounter {
+		t.Errorf("expected Counter %v, got %v", expectedCounter, retrievedCounter)
+	}
+
+	nonExistentGym := "GymB"
+	retrievedCounter = counters.Counter(nonExistentGym)
+	if (retrievedCounter != Counter{}) {
+		t.Errorf("expected default Counter for non-existent gym, got %v", retrievedCounter)
+	}
+}

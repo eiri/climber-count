@@ -13,7 +13,11 @@ func NewCounters() *Counters {
 }
 
 func (c *Counters) Counter(gym string) Counter {
-	return (*c)[gym]
+	counter, ok := (*c)[gym]
+	if !ok {
+		return Counter{}
+	}
+	return counter
 }
 
 type Counter struct {
