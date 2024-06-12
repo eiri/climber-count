@@ -32,10 +32,10 @@ func main() {
 
 	sched := quartz.NewStdScheduler()
 	sched.Start(ctx)
-	// pull the count every 5 minutes
-	crontab := "0 */5 * * * *"
-	cronTrigger, _ := quartz.NewCronTrigger(crontab)
-	sched.ScheduleJob(quartz.NewJobDetail(jh, quartz.NewJobKey(cfg.Gym)), cronTrigger)
+	for key, crontab := range cfg.Schedule {
+		cronTrigger, _ := quartz.NewCronTrigger(crontab)
+		sched.ScheduleJob(quartz.NewJobDetail(jh, quartz.NewJobKey(key)), cronTrigger)
+	}
 	defer func() {
 		sched.Stop()
 		sched.Wait(ctx)

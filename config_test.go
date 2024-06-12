@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -97,5 +98,84 @@ func TestNewConfig_OptionalVarNotSet(t *testing.T) {
 	}
 	if cfg.Storage != "" {
 		t.Errorf("expected STORAGE to be empty, got %q", cfg.Storage)
+	}
+}
+
+func TestNewConfig_NoEnvVar(t *testing.T) {
+	envVars := map[string]string{
+		"PGK":       "pgk_value",
+		"FID":       "fid_value",
+		"GYM":       "gym_value",
+		"BOT_TOKEN": "bot_token_value",
+	}
+	setEnvVars(envVars)
+	defer unsetEnvVars(envVars)
+
+	os.Unsetenv("SCHEDULE")
+
+	cfg, err := NewConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(cfg.Schedule) != 0 {
+		t.Errorf("expected empty Schedule, got %v", cfg.Schedule)
+	}
+}
+
+func TestNewConfig_WithEnvVar(t *testing.T) {
+	envVars := map[string]string{
+		"PGK":       "pgk_value",
+		"FID":       "fid_value",
+		"GYM":       "gym_value",
+		"BOT_TOKEN": "bot_token_value",
+		"SCHEDULE":  "task1=0 */5 * * * MON-FRI|task2=* 12 * * * 2|task3=0 5 12,2 * * *",
+	}
+	setEnvVars(envVars)
+	defer unsetEnvVars(envVars)
+
+	expectedSchedule := map[string]string{
+		"task1": "0 */5 * * * MON-FRI",
+		"task2": "* 12 * * * 2",
+		"task3": "0 5 12,2 * * *",
+	}
+
+	cfg, err := NewConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(cfg.Schedule, expectedSchedule) {
+		t.Errorf("expected Schedule %v, got %v", expectedSchedule, cfg.Schedule)
+	}
+}
+
+func TestNewConfig_WithMalformedEnvVar(t *testing.T) {
+	envVars := map[string]string{
+		"PGK":       "pgk_value",
+		"FID":       "fid_value",
+		"GYM":       "gym_value",
+		"BOT_TOKEN": "bot_token_value",
+		"SCHEDULE":  "task1=0 */5 * * * MON-FRI|task2|task3=0 5 12,2 * * *",
+	}
+	setEnvVars(envVars)
+	defer unsetEnvVars(envVars)
+
+	expectedSchedule := map[string]string{
+		"task1": "0 */5 * * * MON-FRI",
+		"task3": "0 5 12,2 * * *",
+	}
+
+	cfg, err := NewConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(cfg.Schedule, expectedSchedule) {
+		t.Errorf("expected Schedule %v, got %v", expectedSchedule, cfg.Schedule)
+	}
+
+	if _, exists := cfg.Schedule["task2"]; exists {
+		t.Errorf("did not expect task2 in Schedule, got %v", cfg.Schedule)
 	}
 }

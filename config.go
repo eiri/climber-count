@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Config struct {
@@ -11,10 +12,13 @@ type Config struct {
 	Gym      string
 	BotToken string
 	Storage  string
+	Schedule map[string]string
 }
 
 func NewConfig() (*Config, error) {
-	cfg := Config{}
+	cfg := Config{
+		Schedule: make(map[string]string),
+	}
 	envVars := map[string]*string{
 		"PGK":       &cfg.PGK,
 		"FID":       &cfg.FID,
@@ -29,6 +33,15 @@ func NewConfig() (*Config, error) {
 			return &cfg, fmt.Errorf("The required env var %q is not set", key)
 		}
 		*ptr = val
+	}
+
+	if val, ok := os.LookupEnv("SCHEDULE"); ok {
+		for _, subVal := range strings.Split(val, "|") {
+			if strings.Contains(subVal, "=") {
+				kv := strings.SplitN(subVal, "=", 2)
+				cfg.Schedule[kv[0]] = kv[1]
+			}
+		}
 	}
 
 	return &cfg, nil
