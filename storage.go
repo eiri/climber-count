@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
+	"path"
 	"strconv"
 	"time"
 )
@@ -13,6 +15,7 @@ import (
 type Storer interface {
 	Store(counter Counter) error
 	Last() (Counter, bool)
+	Rotate() error
 }
 
 // Storage struct with the path to the storage file
@@ -35,7 +38,6 @@ func (s *Storage) Store(counter Counter) error {
 		return err
 	}
 	defer file.Close()
-	logger.Info("opened file", "path", s.filePath)
 
 	// Read the existing records
 	records, err := csv.NewReader(file).ReadAll()
@@ -109,4 +111,26 @@ func (s *Storage) Last() (Counter, bool) {
 	}
 	logger.Info("found last record", "counter", counter)
 	return counter, true
+}
+
+func (s *Storage) Rotate() error {
+	logger := slog.Default().With("component", "storage", "function", "rotate")
+	file, err := os.Open(s.filePath)
+	if err != nil {
+		logger.Error("can't open file", "msg", err)
+		return fmt.Errorf("failed to open file: %v", err)
+	}
+	defer file.Close()
+
+	currentDate := time.Now().Format("20060102")
+	newFilePath := fmt.Sprintf("%s-%s.csv", s.filePath[:len(s.filePath)-4], currentDate)
+
+	logger.Info("renaming file", "newFileName", path.Base(newFilePath))
+	err = os.Rename(s.filePath, newFilePath)
+	if err != nil {
+		logger.Error("can't rename file", "msg", err)
+		return fmt.Errorf("failed to rename file: %v", err)
+	}
+
+	return nil
 }

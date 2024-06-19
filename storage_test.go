@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
@@ -209,5 +210,46 @@ func TestLast_EmptyStorage(t *testing.T) {
 	_, ok := st.Last()
 	if ok {
 		t.Fatalf("expected no last counter in empty storage")
+	}
+}
+
+func TestStorage_Rotate_FileNotExist(t *testing.T) {
+	storage := &Storage{filePath: "nonexistentfile.csv"}
+	err := storage.Rotate()
+	if err == nil || err.Error() != "failed to open file: open nonexistentfile.csv: no such file or directory" {
+		t.Errorf("expected file does not exist error, got %v", err)
+	}
+}
+
+func TestStorage_Rotate_Success(t *testing.T) {
+	// Create a temporary directory
+	tempDir, err := os.MkdirTemp("", "storage_test")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a temporary file
+	tempFile, err := os.CreateTemp(tempDir, "testfile*.csv")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	tempFilePath := tempFile.Name()
+	tempFile.Close()
+
+	// Initialize storage
+	storage := &Storage{filePath: tempFilePath}
+
+	// Rotate the file
+	err = storage.Rotate()
+	if err != nil {
+		t.Fatalf("unexpected error during rotate: %v", err)
+	}
+
+	// Check if the file was renamed correctly
+	currentDate := time.Now().Format("20060102")
+	expectedFilePath := fmt.Sprintf("%s-%s.csv", tempFilePath[:len(tempFilePath)-4], currentDate)
+	if _, err := os.Stat(expectedFilePath); os.IsNotExist(err) {
+		t.Errorf("expected file to be renamed to %s, but it does not exist", expectedFilePath)
 	}
 }
