@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"unicode"
@@ -13,6 +14,22 @@ import (
 )
 
 const USER_AGENT = "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+
+type ClientRoundTripper struct{}
+
+func (crt ClientRoundTripper) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+	logger := slog.Default().With("component", "client")
+	logger.Info("sending request", "url", req.URL)
+
+	resp, err = http.DefaultTransport.RoundTrip(req)
+	if err != nil {
+		logger.Error("bad reply", "msg", err)
+		return
+	}
+
+	logger.Info("got response", "status", resp.Status)
+	return
+}
 
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -33,20 +50,24 @@ func NewClient(cfg *Config) *Client {
 	req.Header.Set("Accept", "text/html")
 	req.Header.Set("User-Agent", USER_AGENT)
 
-	return &Client{req, &http.Client{}}
+	rt := ClientRoundTripper{}
+	return &Client{req, &http.Client{Transport: rt}}
 }
 
 func (c *Client) Counters() (*Counters, error) {
+	logger := slog.Default().With("component", "client")
 	counters := NewCounters()
 
 	body, err := c.fetch()
 	if err != nil {
+		logger.Error("can't fetch page", "msg", err)
 		return counters, err
 	}
 	defer body.Close()
 
 	doc, err := html.Parse(body)
 	if err != nil {
+		logger.Error("can't parse page", "msg", err)
 		return counters, err
 	}
 

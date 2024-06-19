@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -12,6 +15,8 @@ import (
 )
 
 func main() {
+	SetLogger()
+
 	cfg, err := NewConfig()
 	if err != nil {
 		log.Fatal(err)
@@ -30,10 +35,12 @@ func main() {
 		log.Fatal(err)
 	}
 
+	loc := time.Now().Location()
 	sched := quartz.NewStdScheduler()
 	sched.Start(ctx)
 	for key, crontab := range cfg.Schedule {
-		cronTrigger, _ := quartz.NewCronTrigger(crontab)
+		slog.Info("schedule job", "job_key", key, "crontab", crontab, "loc", loc)
+		cronTrigger, _ := quartz.NewCronTriggerWithLoc(crontab, loc)
 		sched.ScheduleJob(quartz.NewJobDetail(jh, quartz.NewJobKey(key)), cronTrigger)
 	}
 	defer func() {
@@ -44,6 +51,12 @@ func main() {
 	opts := []bot.Option{
 		// just no-op
 		bot.WithDefaultHandler(func(ctx context.Context, b *bot.Bot, update *models.Update) {}),
+		bot.WithDebugHandler(func(format string, args ...interface{}) {
+			slog.Debug(fmt.Sprintf(format, args), "component", "telegram bot")
+		}),
+		bot.WithErrorsHandler(func(err error) {
+			slog.Error("telegram error", "msg", err, "component", "telegram bot")
+		}),
 	}
 
 	b, err := bot.New(cfg.BotToken, opts...)

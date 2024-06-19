@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -23,12 +24,15 @@ func NewJobHandler(gym string, client *Client, storage Storer) *JobHandler {
 }
 
 func (jh *JobHandler) Execute(ctx context.Context) error {
+	logger := slog.Default().With("component", "cron handler")
 	counters, err := jh.client.Counters()
 	if err != nil {
+		logger.Error("can't get counters from client", "msg", err)
 		return err
 	}
 
 	counter := counters.Counter(jh.gym)
+	logger.Info("got counter from client", "counter", counter)
 	return jh.storage.Store(counter)
 }
 
@@ -51,7 +55,9 @@ func (bh *BotHandler) Handler(ctx context.Context, b *bot.Bot, update *models.Up
 		return
 	}
 
+	logger := slog.Default().With("component", "bot handler")
 	if counter, ok := bh.storage.Last(); ok {
+		logger.Info("sending reply", "chat_id", update.Message.Chat.ID, "text", counter)
 		b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID:    update.Message.Chat.ID,
 			Text:      fmt.Sprintln(counter),
