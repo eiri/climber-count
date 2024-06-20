@@ -84,10 +84,11 @@ func TestCounter_String(t *testing.T) {
 		counter Counter
 		want    string
 	}{
-		{Counter{Count: 1}, "One person on the wall"},
-		{Counter{Count: 2}, "2 people on the wall"},
-		{Counter{Count: 0}, "One person on the wall"}, // Assuming the default message for zero is "One person on the wall"
-		{Counter{Count: 100}, "100 people on the wall"},
+		{Counter{Count: 1}, "a long while ago there've been one person on the wall"},
+		{Counter{Count: 2, LastUpdate: LastUpdate{time.Now()}}, "at the moment there's 2 people on the wall"},
+		{Counter{Count: 0}, "a long while ago there've been zero people on the wall"}, // Assuming the default message for zero is "One person on the wall"
+		{Counter{Count: 100, LastUpdate: LastUpdate{time.Now().Add(-3 * time.Minute)}}, "3 minutes ago there've been 100 people on the wall"},
+		{Counter{Count: 101, LastUpdate: LastUpdate{time.Now().Add(-2 * time.Hour)}}, "2 hours ago there've been 101 person on the wall"},
 	}
 
 	for _, tt := range tests {

@@ -3,7 +3,11 @@ package main
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"time"
+
+	"github.com/dustin/go-humanize"
+	"github.com/dustin/go-humanize/english"
 )
 
 type Counters map[string]Counter
@@ -27,11 +31,19 @@ type Counter struct {
 }
 
 func (c Counter) String() string {
-	msg := "One person on the wall"
-	if c.Count > 1 {
-		msg = fmt.Sprintf("%d people on the wall", c.Count)
+	lastUpdate := humanize.Time(c.LastUpdate.Time)
+	peopleCount := strconv.Itoa(c.Count)
+	if peopleCount == "0" {
+		peopleCount = "zero"
+	} else if peopleCount == "1" {
+		peopleCount = "one"
 	}
-	return msg
+	peopleCounter := english.PluralWord(c.Count%10, "person", "people")
+
+	if lastUpdate == "now" {
+		return fmt.Sprintf("at the moment there's %s %s on the wall", peopleCount, peopleCounter)
+	}
+	return fmt.Sprintf("%s there've been %s %s on the wall", lastUpdate, peopleCount, peopleCounter)
 }
 
 var re = regexp.MustCompile(`\d{1,}:\d{2}[AP]M`)
