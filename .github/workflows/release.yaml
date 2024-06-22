@@ -11,6 +11,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_CLI_EXPERIMENTAL: enabled
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -24,6 +26,14 @@ jobs:
           go-version: 1.22
           check-latest: true
           cache: true
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build release
         uses: goreleaser/goreleaser-action@v6
         with:
