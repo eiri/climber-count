@@ -30,11 +30,8 @@ image:
 	go build -o $(PROJECT) ./...
 	docker buildx build -t ghcr.io/eiri/$(PROJECT):latest . --platform=linux/arm64
 
-sbl.csv:
-	touch $@
-
 .PHONY: docker-up
-docker-up: sbl.csv
+docker-up:
 	docker compose up -d
 
 .PHONY: docker-down
