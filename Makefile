@@ -28,7 +28,7 @@ image: export GOOS=linux
 image: export GOARCH=arm64
 image:
 	go build -o $(PROJECT) ./...
-	docker buildx build -t gcr.io/eiri/$(PROJECT):latest . --platform=linux/arm64
+	docker buildx build -t ghcr.io/eiri/$(PROJECT):latest . --platform=linux/arm64
 
 sbl.csv:
 	touch $@

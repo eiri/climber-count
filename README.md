@@ -11,7 +11,7 @@ This is a Telegram bot that scrapes the rockgympro.com climber count gauge for a
 
 ## Installation
 
-You can either download the binary from the release tab, use Homebrew with `brew tap eiri/tap` and `brew install climber-count`, or use Docker with `docker pull gcr.io/eiri/climber-count`.
+You can either download the binary from the release tab, use Homebrew with `brew tap eiri/tap` and `brew install climber-count`, or use Docker with `docker pull ghcr.io/eiri/climber-count`.
 
 ## Configuration
 

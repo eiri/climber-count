@@ -1,6 +1,6 @@
 services:
   climber-count:
-    image: gcr.io/eiri/climber-count
+    image: ghcr.io/eiri/climber-count
     env_file: ".env"
     volumes:
       - /etc/timezone:/etc/timezone:ro
