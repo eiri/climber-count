@@ -6,5 +6,5 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-telegram/bot v1.5.0
 	github.com/reugn/go-quartz v0.12.0
-	golang.org/x/net v0.26.0
+	golang.org/x/net v0.27.0
 )
