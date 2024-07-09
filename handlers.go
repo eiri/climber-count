@@ -40,26 +40,6 @@ func (jh *JobHandler) Description() string {
 	return fmt.Sprintf("Climber Count Job for %q", jh.gym)
 }
 
-type StorageRotateHandler struct {
-	storage Storer
-}
-
-func NewStorageRotateHandler(storage Storer) *StorageRotateHandler {
-	return &StorageRotateHandler{
-		storage: storage,
-	}
-}
-
-func (srh *StorageRotateHandler) Execute(ctx context.Context) error {
-	logger := slog.Default().With("component", "storage rotate handler")
-	logger.Info("call storage rotate", "storage", srh.storage)
-	return srh.storage.Rotate()
-}
-
-func (srh *StorageRotateHandler) Description() string {
-	return "Storage rotation job"
-}
-
 type BotHandler struct {
 	storage Storer
 }

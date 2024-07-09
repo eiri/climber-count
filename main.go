@@ -23,9 +23,12 @@ func main() {
 	}
 
 	client := NewClient(cfg)
-	storage := NewStorage(cfg.Storage)
+	storage, err := NewStorage(cfg.Storage)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	jh := NewJobHandler(cfg.Gym, client, storage)
-	srh := NewStorageRotateHandler(storage)
 	bh := NewBotHandler(storage)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -44,10 +47,6 @@ func main() {
 		cronTrigger, _ := quartz.NewCronTriggerWithLoc(crontab, loc)
 		sched.ScheduleJob(quartz.NewJobDetail(jh, quartz.NewJobKey(key)), cronTrigger)
 	}
-	// rotate logs at midnight
-	slog.Info("schedule job", "job_key", "rotate_storage", "crontab", "0 2 0 * * *", "loc", loc)
-	midnight, _ := quartz.NewCronTriggerWithLoc("0 2 0 * * *", loc)
-	sched.ScheduleJob(quartz.NewJobDetail(srh, quartz.NewJobKey("rotate_storage")), midnight)
 	// shutdown sched on exit
 	defer func() {
 		sched.Stop()

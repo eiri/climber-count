@@ -9,6 +9,7 @@ $(PROJECT): $(SRC)
 	go build -o $@ ./...
 
 .PHONY: build
+build: export CGO_ENABLED=0
 build: $(PROJECT)
 
 .PHONY: test

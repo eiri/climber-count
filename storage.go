@@ -1,136 +1,109 @@
 package main
 
 import (
-	"encoding/csv"
-	"fmt"
-	"io"
+	"database/sql"
 	"log/slog"
-	"os"
-	"path"
-	"strconv"
 	"time"
+
+	_ "modernc.org/sqlite"
 )
 
 // Storer interface with a single Store method
 type Storer interface {
 	Store(counter Counter) error
 	Last() (Counter, bool)
-	Rotate() error
 }
 
 // Storage struct with the path to the storage file
 type Storage struct {
 	filePath string
+	db       *sql.DB
 }
 
 // NewStorage creates a new Storage instance with the given file path
-func NewStorage(filePath string) *Storage {
-	return &Storage{filePath: filePath}
+func NewStorage(filePath string) (*Storage, error) {
+	db, err := sql.Open("sqlite", filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create table if it doesn't exist
+	createTableQuery := `
+    CREATE TABLE IF NOT EXISTS count (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        count INTEGER,
+        capacity INTEGER,
+        last_update TEXT
+    );`
+	_, err = db.Exec(createTableQuery)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Storage{db: db, filePath: filePath}, nil
 }
 
-// Store stores the given counter in the storage file as a CSV record
+// Store stores the given counter in the storage table
 func (s *Storage) Store(counter Counter) error {
 	logger := slog.Default().With("component", "storage")
-	// Check if the file exists
-	file, err := os.OpenFile(s.filePath, os.O_RDWR|os.O_CREATE, 0644)
-	if err != nil {
-		logger.Error("can't open file", "msg", err)
-		return err
-	}
-	defer file.Close()
-
-	// Read the existing records
-	records, err := csv.NewReader(file).ReadAll()
-	if err != nil && err.Error() != "EOF" {
-		return err
-	}
 
 	// Check for deduplication
-	if len(records) > 0 {
-		lastRecord := records[len(records)-1]
-		lastUpdate, err := time.Parse(time.RFC3339, lastRecord[2])
+	var lastUpdate string
+	query := "SELECT last_update FROM count ORDER BY id DESC LIMIT 1"
+	err := s.db.QueryRow(query).Scan(&lastUpdate)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	if lastUpdate != "" {
+		lastTime, err := time.Parse(time.RFC3339, lastUpdate)
 		if err != nil {
 			return err
 		}
-		if counter.LastUpdate.Equal(lastUpdate) {
+		if counter.LastUpdate.Equal(lastTime) {
 			// Last update is the same, do nothing
 			logger.Info("skipping duplicated counter", "counter", counter)
 			return nil
 		}
 	}
 
-	record := []string{
-		strconv.Itoa(counter.Count),
-		strconv.Itoa(counter.Capacity),
-		counter.LastUpdate.Format(time.RFC3339),
-	}
-
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
-
-	if _, err := file.Seek(0, io.SeekEnd); err != nil {
+	// Insert new record
+	insertQuery := `
+    INSERT INTO count (count, capacity, last_update)
+    VALUES (?, ?, ?)`
+	_, err = s.db.Exec(insertQuery, counter.Count, counter.Capacity, counter.LastUpdate.Format(time.RFC3339))
+	if err != nil {
 		return err
 	}
 
-	logger.Info("storing record", "record", record)
-	return writer.Write(record)
+	logger.Info("storing record", "counter", counter)
+	return nil
 }
 
 // Last returns the last stored Counter and a boolean indicating if it was successful
 func (s *Storage) Last() (Counter, bool) {
 	logger := slog.Default().With("component", "storage", "function", "last")
-	file, err := os.Open(s.filePath)
+	var counter Counter
+
+	query := "SELECT count, capacity, last_update FROM count ORDER BY id DESC LIMIT 1"
+	row := s.db.QueryRow(query)
+	var lastUpdate string
+	if err := row.Scan(&counter.Count, &counter.Capacity, &lastUpdate); err != nil {
+		if err == sql.ErrNoRows {
+			logger.Info("no records in table")
+			return Counter{}, false
+		}
+		logger.Error("can't read from table", "msg", err)
+		return Counter{}, false
+	}
+
+	parsedTime, err := time.Parse(time.RFC3339, lastUpdate)
 	if err != nil {
-		logger.Error("can't open file", "msg", err)
-		return Counter{}, false
-	}
-	defer file.Close()
-
-	records, err := csv.NewReader(file).ReadAll()
-	if err != nil && err.Error() != "EOF" {
-		logger.Error("can't read file", "msg", err)
+		logger.Error("invalid time format", "msg", err)
 		return Counter{}, false
 	}
 
-	if len(records) == 0 {
-		logger.Info("no records in file")
-		return Counter{}, false
-	}
-
-	lastRecord := records[len(records)-1]
-	count, _ := strconv.Atoi(lastRecord[0])
-	capacity, _ := strconv.Atoi(lastRecord[1])
-	lastUpdate, _ := time.Parse(time.RFC3339, lastRecord[2])
-
-	counter := Counter{
-		Count:    count,
-		Capacity: capacity,
-		LastUpdate: LastUpdate{
-			Time: lastUpdate,
-		},
-	}
+	counter.LastUpdate = LastUpdate{Time: parsedTime}
 	logger.Info("found last record", "counter", counter)
 	return counter, true
-}
-
-func (s *Storage) Rotate() error {
-	logger := slog.Default().With("component", "storage", "function", "rotate")
-	file, err := os.Open(s.filePath)
-	if err != nil {
-		logger.Error("can't open file", "msg", err)
-		return fmt.Errorf("failed to open file: %v", err)
-	}
-	defer file.Close()
-
-	currentDate := time.Now().Format("20060102")
-	newFilePath := fmt.Sprintf("%s-%s.csv", s.filePath[:len(s.filePath)-4], currentDate)
-
-	logger.Info("renaming file", "newFileName", path.Base(newFilePath))
-	err = os.Rename(s.filePath, newFilePath)
-	if err != nil {
-		logger.Error("can't rename file", "msg", err)
-		return fmt.Errorf("failed to rename file: %v", err)
-	}
-
-	return nil
 }
