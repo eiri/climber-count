@@ -69,7 +69,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/count", bot.MatchTypeExact, bh.Handler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/count", bot.MatchTypeExact, bh.CountHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "ping", bot.MatchTypePrefix, bh.PingHandler)
 
 	b.Start(ctx)
 }

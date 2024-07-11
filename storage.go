@@ -8,16 +8,22 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// CallbackFunc is a function that called during Store if set. If the function returns `true` it is unset by Storer.
+type CallbackFunc func(Counter) bool
+
 // Storer interface with a single Store method
 type Storer interface {
 	Store(counter Counter) error
 	Last() (Counter, bool)
+	SetCallback(CallbackFunc)
+	RemoveCallback()
 }
 
 // Storage struct with the path to the storage file
 type Storage struct {
 	filePath string
 	db       *sql.DB
+	callback CallbackFunc
 }
 
 // NewStorage creates a new Storage instance with the given file path
@@ -43,9 +49,27 @@ func NewStorage(filePath string) (*Storage, error) {
 	return &Storage{db: db, filePath: filePath}, nil
 }
 
+// SetCallback sets a callback function that will be only called once
+func (s *Storage) SetCallback(cb CallbackFunc) {
+	s.callback = cb
+}
+
+// RemoveCallback removes the callback function from Storage
+func (s *Storage) RemoveCallback() {
+	s.callback = nil
+}
+
 // Store stores the given counter in the storage table
 func (s *Storage) Store(counter Counter) error {
 	logger := slog.Default().With("component", "storage")
+
+	// Call callback if set
+	if s.callback != nil {
+		done := s.callback(counter)
+		if done {
+			s.callback = nil
+		}
+	}
 
 	// Check for deduplication
 	var lastUpdate string

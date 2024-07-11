@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
+	"strings"
 
+	"github.com/enescakir/emoji"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 )
@@ -42,26 +45,79 @@ func (jh *JobHandler) Description() string {
 
 type BotHandler struct {
 	storage Storer
+	logger  *slog.Logger
 }
 
 func NewBotHandler(storage Storer) *BotHandler {
+	logger := slog.Default().With("component", "bot count handler")
 	return &BotHandler{
 		storage: storage,
+		logger:  logger,
 	}
 }
 
-func (bh *BotHandler) Handler(ctx context.Context, b *bot.Bot, update *models.Update) {
+func (bh *BotHandler) CountHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	if update.Message == nil {
 		return
 	}
 
-	logger := slog.Default().With("component", "bot handler")
 	if counter, ok := bh.storage.Last(); ok {
-		logger.Info("sending reply", "chat_id", update.Message.Chat.ID, "text", counter)
-		b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID:    update.Message.Chat.ID,
-			Text:      fmt.Sprintln(counter),
-			ParseMode: models.ParseModeMarkdown,
-		})
+		b.SendMessage(ctx, bh.Message(b, update.Message.Chat.ID, counter.String()))
+	}
+}
+
+func (bh *BotHandler) PingHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if update.Message == nil {
+		return
+	}
+
+	chatID := update.Message.Chat.ID
+	msgID := update.Message.ID
+
+	if update.Message.Text == "ping off" {
+		bh.storage.RemoveCallback()
+		b.SetMessageReaction(ctx, bh.Reaction(b, chatID, msgID, emoji.ThumbsUp.String()))
+		return
+	}
+
+	args := strings.Split(update.Message.Text, " ")
+	if len(args) != 3 || args[1] != "on" {
+		return
+	}
+
+	number, err := strconv.Atoi(args[2])
+	if err != nil {
+		bh.logger.Error("can't parse number", "msg", err)
+		b.SendMessage(ctx, bh.Message(b, chatID, "Please provide a valid number."))
+		return
+	}
+
+	bh.storage.SetCallback(func(c Counter) bool {
+		if c.Count <= number {
+			b.SendMessage(ctx, bh.Message(b, chatID, fmt.Sprintf("Hey, %s", c)))
+			return true
+		}
+		return false
+	})
+	b.SetMessageReaction(ctx, bh.Reaction(b, chatID, msgID, emoji.Handshake.String()))
+}
+
+func (bh *BotHandler) Message(b *bot.Bot, chatID int64, msg string) *bot.SendMessageParams {
+	bh.logger.Info("sending reply", "chat_id", chatID, "text", msg)
+	return &bot.SendMessageParams{ChatID: chatID, Text: msg}
+}
+
+func (bh *BotHandler) Reaction(b *bot.Bot, chatID int64, msgId int, emoji string) *bot.SetMessageReactionParams {
+	bh.logger.Info("sending reply", "chat_id", chatID, "reply", emoji)
+	return &bot.SetMessageReactionParams{
+		ChatID:    chatID,
+		MessageID: msgId,
+		Reaction: []models.ReactionType{{
+			Type: models.ReactionTypeTypeEmoji,
+			ReactionTypeEmoji: &models.ReactionTypeEmoji{
+				Type:  models.ReactionTypeTypeEmoji,
+				Emoji: emoji,
+			}},
+		},
 	}
 }
