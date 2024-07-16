@@ -30,7 +30,7 @@ func NewConfig() (*Config, error) {
 	for key, ptr := range envVars {
 		val, ok := os.LookupEnv(key)
 		if key != "STORAGE" && !ok {
-			return &cfg, fmt.Errorf("The required env var %q is not set", key)
+			return &cfg, fmt.Errorf("the required env var %q is not set", key)
 		}
 		*ptr = val
 	}

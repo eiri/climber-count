@@ -39,6 +39,9 @@ func (c Counter) String() string {
 		peopleCount = "one"
 	}
 	peopleCounter := english.PluralWord(c.Count%10, "person", "people")
+	if peopleCount == "11" {
+		peopleCounter = "people"
+	}
 
 	if lastUpdate == "now" {
 		return fmt.Sprintf("at the moment there's %s %s on the wall", peopleCount, peopleCounter)

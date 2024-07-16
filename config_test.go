@@ -63,7 +63,7 @@ func TestNewConfig_RequiredVarsNotSet(t *testing.T) {
 		t.Fatal("expected an error, but got nil")
 	}
 
-	expectedError := "The required env var"
+	expectedError := "the required env var"
 	if err != nil && err.Error()[:len(expectedError)] != expectedError {
 		t.Errorf("expected error to start with %q, got %q", expectedError, err.Error())
 	}
