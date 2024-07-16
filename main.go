@@ -71,6 +71,7 @@ func main() {
 
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/count", bot.MatchTypeExact, bh.CountHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "ping", bot.MatchTypePrefix, bh.PingHandler)
+	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, "ping", bot.MatchTypePrefix, bh.PingButtonHandler)
 
 	b.Start(ctx)
 }

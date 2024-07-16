@@ -49,7 +49,7 @@ type BotHandler struct {
 }
 
 func NewBotHandler(storage Storer) *BotHandler {
-	logger := slog.Default().With("component", "bot count handler")
+	logger := slog.Default().With("component", "bot handler")
 	return &BotHandler{
 		storage: storage,
 		logger:  logger,
@@ -73,6 +73,21 @@ func (bh *BotHandler) PingHandler(ctx context.Context, b *bot.Bot, update *model
 
 	chatID := update.Message.Chat.ID
 	msgID := update.Message.ID
+
+	if update.Message.Text == "ping" {
+		msg := bh.Message(b, chatID, "On how many?")
+		msg.ReplyMarkup = &models.InlineKeyboardMarkup{
+			InlineKeyboard: [][]models.InlineKeyboardButton{
+				{
+					{Text: "10", CallbackData: "ping on 10"},
+					{Text: "20", CallbackData: "ping on 20"},
+					{Text: "30", CallbackData: "ping on 30"},
+				},
+			},
+		}
+		b.SendMessage(ctx, msg)
+		return
+	}
 
 	if update.Message.Text == "ping off" {
 		bh.storage.RemoveCallback()
@@ -100,6 +115,41 @@ func (bh *BotHandler) PingHandler(ctx context.Context, b *bot.Bot, update *model
 		return false
 	})
 	b.SetMessageReaction(ctx, bh.Reaction(b, chatID, msgID, emoji.Handshake.String()))
+}
+
+func (bh *BotHandler) PingButtonHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if update.CallbackQuery == nil {
+		return
+	}
+
+	b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: update.CallbackQuery.ID,
+		ShowAlert:       false,
+	})
+
+	chatID := update.CallbackQuery.Message.Message.Chat.ID
+
+	args := strings.Split(update.CallbackQuery.Data, " ")
+	if len(args) != 3 || args[1] != "on" {
+		return
+	}
+
+	number, err := strconv.Atoi(args[2])
+	if err != nil {
+		bh.logger.Error("can't parse number", "msg", err)
+		return
+	}
+
+	bh.storage.SetCallback(func(c Counter) bool {
+		if c.Count <= number {
+			b.SendMessage(ctx, bh.Message(b, chatID, fmt.Sprintf("Hey, %s", c)))
+			return true
+		}
+		return false
+	})
+
+	msg := fmt.Sprintf("Ok, I'll ping you once there are %d people on the wall.", number)
+	b.SendMessage(ctx, bh.Message(b, chatID, msg))
 }
 
 func (bh *BotHandler) Message(b *bot.Bot, chatID int64, msg string) *bot.SendMessageParams {
