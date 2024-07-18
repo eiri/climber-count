@@ -152,6 +152,56 @@ func (bh *BotHandler) PingButtonHandler(ctx context.Context, b *bot.Bot, update 
 	b.SendMessage(ctx, bh.Message(b, chatID, msg))
 }
 
+func (bh *BotHandler) GymHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if update.Message == nil {
+		return
+	}
+
+	chatID := update.Message.Chat.ID
+
+	msg := bh.Message(b, chatID, "Going into the gym?")
+	msg.ReplyMarkup = &models.InlineKeyboardMarkup{
+		InlineKeyboard: [][]models.InlineKeyboardButton{
+			{
+				{Text: "Yeah", CallbackData: "gym_in"},
+				{Text: "Done", CallbackData: "gym_out"},
+			},
+		},
+	}
+	b.SendMessage(ctx, msg)
+}
+
+func (bh *BotHandler) GymButtonHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if update.CallbackQuery == nil {
+		return
+	}
+
+	b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: update.CallbackQuery.ID,
+		ShowAlert:       false,
+	})
+
+	chatID := update.CallbackQuery.Message.Message.Chat.ID
+
+	if update.CallbackQuery.Data == "gym_in" {
+		msg := "Have a great climb!"
+		err := bh.storage.GetGym().In()
+		if err != nil {
+			msg = err.Error()
+		}
+		b.SendMessage(ctx, bh.Message(b, chatID, msg))
+	}
+
+	if update.CallbackQuery.Data == "gym_out" {
+		msg, err := bh.storage.GetGym().Out()
+		if err != nil {
+			b.SendMessage(ctx, bh.Message(b, chatID, err.Error()))
+			return
+		}
+		b.SendMessage(ctx, bh.Message(b, chatID, fmt.Sprintf("You went to gym %s. Good job!", msg)))
+	}
+}
+
 func (bh *BotHandler) Message(b *bot.Bot, chatID int64, msg string) *bot.SendMessageParams {
 	bh.logger.Info("sending reply", "chat_id", chatID, "text", msg)
 	return &bot.SendMessageParams{ChatID: chatID, Text: msg}

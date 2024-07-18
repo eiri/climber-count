@@ -27,6 +27,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	err = storage.NewGym()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	jh := NewJobHandler(cfg.Gym, client, storage)
 	bh := NewBotHandler(storage)
@@ -72,6 +76,8 @@ func main() {
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/count", bot.MatchTypeExact, bh.CountHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "ping", bot.MatchTypePrefix, bh.PingHandler)
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, "ping", bot.MatchTypePrefix, bh.PingButtonHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/gym", bot.MatchTypeExact, bh.GymHandler)
+	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, "gym", bot.MatchTypePrefix, bh.GymButtonHandler)
 
 	b.Start(ctx)
 }

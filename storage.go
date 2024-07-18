@@ -17,6 +17,8 @@ type Storer interface {
 	Last() (Counter, bool)
 	SetCallback(CallbackFunc)
 	RemoveCallback()
+	NewGym() error
+	GetGym() *Gym
 }
 
 // Storage struct with the path to the storage file
@@ -24,6 +26,7 @@ type Storage struct {
 	filePath string
 	db       *sql.DB
 	callback CallbackFunc
+	gym      *Gym
 }
 
 // NewStorage creates a new Storage instance with the given file path
@@ -57,6 +60,19 @@ func (s *Storage) SetCallback(cb CallbackFunc) {
 // RemoveCallback removes the callback function from Storage
 func (s *Storage) RemoveCallback() {
 	s.callback = nil
+}
+
+// NewGym initializes and stores the Gym instance using the Storage's file path.
+// It returns an error if the Gym instance cannot be created.
+func (s *Storage) NewGym() error {
+	var err error
+	s.gym, err = NewGym(s.filePath)
+	return err
+}
+
+// GetGym returns the Gym instance associated with the Storage object.
+func (s *Storage) GetGym() *Gym {
+	return s.gym
 }
 
 // Store stores the given counter in the storage table
