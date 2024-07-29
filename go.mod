@@ -5,7 +5,7 @@ go 1.21.6
 require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/enescakir/emoji v1.0.0
-	github.com/go-telegram/bot v1.6.0
+	github.com/go-telegram/bot v1.6.1
 	github.com/reugn/go-quartz v0.12.0
 	golang.org/x/net v0.27.0
 	modernc.org/sqlite v1.31.1
