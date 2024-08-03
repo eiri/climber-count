@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/dustin/go-humanize"
+	"github.com/imbue11235/humanize"
 	_ "modernc.org/sqlite"
 )
 
@@ -61,7 +61,7 @@ func (g *Gym) Out() (string, error) {
 		return "", err
 	}
 
-	return humanize.Time(lastInTimestamp), nil
+	return humanize.ExactTime(lastInTimestamp).FromNow(), nil
 }
 
 func (g *Gym) writeAction(action string) error {
