@@ -6,8 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/dustin/go-humanize"
-	"github.com/dustin/go-humanize/english"
+	"github.com/imbue11235/humanize"
 )
 
 type Counters map[string]Counter
@@ -31,21 +30,19 @@ type Counter struct {
 }
 
 func (c Counter) String() string {
-	lastUpdate := humanize.Time(c.LastUpdate.Time)
+	lastUpdate := humanize.Time(c.LastUpdate.Time).FromNow()
 	peopleCount := strconv.Itoa(c.Count)
-	if peopleCount == "0" {
+	peopleCounter := "people"
+	switch peopleCount {
+	case "0":
 		peopleCount = "zero"
-	} else if peopleCount == "1" {
+	case "1":
 		peopleCount = "one"
-	}
-	peopleCounter := english.PluralWord(c.Count%10, "person", "people")
-	if peopleCount == "11" {
-		peopleCounter = "people"
+		peopleCounter = "person"
+	case "21", "31", "41", "51", "61", "71", "81", "91", "101":
+		peopleCounter = "person"
 	}
 
-	if lastUpdate == "now" {
-		return fmt.Sprintf("at the moment there's %s %s on the wall", peopleCount, peopleCounter)
-	}
 	return fmt.Sprintf("%s there've been %s %s on the wall", lastUpdate, peopleCount, peopleCounter)
 }
 
