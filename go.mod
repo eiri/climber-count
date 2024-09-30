@@ -6,7 +6,7 @@ require (
 	github.com/enescakir/emoji v1.0.0
 	github.com/go-telegram/bot v1.8.2
 	github.com/imbue11235/humanize v1.0.2
-	github.com/reugn/go-quartz v0.12.0
+	github.com/reugn/go-quartz v0.13.0
 	golang.org/x/net v0.29.0
 	modernc.org/sqlite v1.33.1
 )
