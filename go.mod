@@ -8,7 +8,7 @@ require (
 	github.com/imbue11235/humanize v1.0.2
 	github.com/reugn/go-quartz v0.13.0
 	golang.org/x/net v0.31.0
-	modernc.org/sqlite v1.34.1
+	modernc.org/sqlite v1.34.2
 )
 
 require (
