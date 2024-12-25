@@ -7,7 +7,7 @@ require (
 	github.com/go-telegram/bot v1.12.1
 	github.com/imbue11235/humanize v1.0.2
 	github.com/reugn/go-quartz v0.13.0
-	golang.org/x/net v0.32.0
+	golang.org/x/net v0.33.0
 	modernc.org/sqlite v1.34.4
 )
 
