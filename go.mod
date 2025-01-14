@@ -7,7 +7,7 @@ require (
 	github.com/go-telegram/bot v1.13.3
 	github.com/imbue11235/humanize v1.0.2
 	github.com/reugn/go-quartz v0.13.0
-	golang.org/x/net v0.33.0
+	golang.org/x/net v0.34.0
 	modernc.org/sqlite v1.34.4
 )
 
@@ -20,7 +20,7 @@ require (
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
-	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
 	modernc.org/gc/v3 v3.0.0-20240107210532-573471604cb6 // indirect
 	modernc.org/libc v1.55.3 // indirect
 	modernc.org/mathutil v1.6.0 // indirect
