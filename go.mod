@@ -8,7 +8,7 @@ require (
 	github.com/imbue11235/humanize v1.0.2
 	github.com/reugn/go-quartz v0.13.0
 	golang.org/x/net v0.34.0
-	modernc.org/sqlite v1.34.5
+	modernc.org/sqlite v1.35.0
 )
 
 require (
@@ -20,7 +20,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/sys v0.29.0 // indirect
-	modernc.org/libc v1.55.3 // indirect
-	modernc.org/mathutil v1.6.0 // indirect
-	modernc.org/memory v1.8.0 // indirect
+	modernc.org/libc v1.61.13 // indirect
+	modernc.org/mathutil v1.7.1 // indirect
+	modernc.org/memory v1.8.2 // indirect
 )
