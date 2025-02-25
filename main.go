@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"github.com/reugn/go-quartz/logger"
 	"github.com/reugn/go-quartz/quartz"
 )
 
@@ -44,7 +45,11 @@ func main() {
 	}
 
 	loc := time.Now().Location()
-	sched := quartz.NewStdScheduler()
+	sched, err := quartz.NewStdScheduler(quartz.WithLogger(logger.NoOpLogger{}))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	sched.Start(ctx)
 	for key, crontab := range cfg.Schedule {
 		slog.Info("schedule job", "job_key", key, "crontab", crontab, "loc", loc)
