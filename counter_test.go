@@ -14,15 +14,45 @@ func TestLastUpdate_UnmarshalJSON(t *testing.T) {
 		hasError bool
 	}{
 		{
+			name:     "Valid time with one day ago",
+			input:    `"Lastupdated:&nbsp1dayago"`,
+			expected: time.Date(time.Now().Year(), time.Now().Add(-24*time.Hour).Month(), time.Now().Add(-24*time.Hour).Day(), time.Now().Hour(), time.Now().Minute(), 0, 0, time.Local),
+			hasError: false,
+		},
+		{
+			name:     "Valid time with days ago",
+			input:    `"Lastupdated:&nbsp2daysago"`,
+			expected: time.Date(time.Now().Year(), time.Now().Add(-24*time.Hour).Month(), time.Now().Add(-48*time.Hour).Day(), time.Now().Hour(), time.Now().Minute(), 0, 0, time.Local),
+			hasError: false,
+		},
+		{
+			name:     "Valid time with one hour ago",
+			input:    `"Lastupdated:&nbsp1hourago"`,
+			expected: time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), time.Now().Add(-1*time.Hour).Hour(), time.Now().Add(-1*time.Hour).Minute(), 0, 0, time.Local),
+			hasError: false,
+		},
+		{
+			name:     "Valid time with hours ago",
+			input:    `"Lastupdated:&nbsp3hoursago"`,
+			expected: time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), time.Now().Add(-3*time.Hour).Hour(), time.Now().Add(-3*time.Hour).Minute(), 0, 0, time.Local),
+			hasError: false,
+		},
+		{
+			name:     "Valid time with one minute ago",
+			input:    `"Lastupdated:&nbsp1minago"`,
+			expected: time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), time.Now().Add(-1*time.Minute).Hour(), time.Now().Add(-1*time.Minute).Minute(), 0, 0, time.Local),
+			hasError: false,
+		},
+		{
 			name:     "Valid time with minutes ago",
-			input:    `"Lastupdated:&nbsp12minsago(10:42PM)"`,
-			expected: time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 22, 42, 0, 0, time.Local),
+			input:    `"Lastupdated:&nbsp12minsago"`,
+			expected: time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), time.Now().Add(-12*time.Minute).Hour(), time.Now().Add(-12*time.Minute).Minute(), 0, 0, time.Local),
 			hasError: false,
 		},
 		{
 			name:     "Valid time with now",
-			input:    `"Lastupdated:&nbspnow(10:52PM)"`,
-			expected: time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 22, 52, 0, 0, time.Local),
+			input:    `"Lastupdated:&nbspnow "`,
+			expected: time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), time.Now().Hour(), time.Now().Minute(), 0, 0, time.Local),
 			hasError: false,
 		},
 		{
@@ -39,21 +69,9 @@ func TestLastUpdate_UnmarshalJSON(t *testing.T) {
 		},
 		{
 			name:     "Invalid time format",
-			input:    `"Lastupdated:&nbsp12minsago(10:xxPM)"`,
+			input:    `"Lastupdated:&nbsp12xxago"`,
 			expected: time.Time{},
 			hasError: true,
-		},
-		{
-			name:     "Boundary time 12:00AM",
-			input:    `"Lastupdated:&nbsp12minsago(12:00AM)"`,
-			expected: time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 0, 0, 0, 0, time.Local),
-			hasError: false,
-		},
-		{
-			name:     "Boundary time 11:59PM",
-			input:    `"Lastupdated:&nbsp12minsago(11:59PM)"`,
-			expected: time.Date(time.Now().Year(), time.Now().Month(), time.Now().Day(), 23, 59, 0, 0, time.Local),
-			hasError: false,
 		},
 	}
 
