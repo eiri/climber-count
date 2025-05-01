@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/imbue11235/humanize"
@@ -46,24 +47,62 @@ func (c Counter) String() string {
 	return fmt.Sprintf("%s there've been %s %s on the wall", lastUpdate, peopleCount, peopleCounter)
 }
 
-var re = regexp.MustCompile(`\d{1,}:\d{2}[AP]M`)
-
 type LastUpdate struct {
 	time.Time
 }
 
+var reRelative = regexp.MustCompile(`(?i)(\d+)?\s?(day|hour|min|mins|days|hours)s?ago`)
+var reNow = regexp.MustCompile(`(?i)now`)
+
 func (lu *LastUpdate) UnmarshalJSON(data []byte) error {
-	if string(data) == "null" || string(data) == `""` {
+	str := strings.Trim(string(data), `"`)
+	if str == "" || str == "null" {
+		lu.Time = time.Time{}
 		return nil
 	}
 
-	match := re.Find(data)
-	kitchen, err := time.Parse(time.Kitchen, string(match))
-	if err != nil {
-		return err
-	}
 	now := time.Now()
-	lastUpdate := time.Date(now.Year(), now.Month(), now.Day(), kitchen.Hour(), kitchen.Minute(), 0, 0, time.Local)
-	*lu = LastUpdate{lastUpdate}
-	return nil
+	if reNow.MatchString(str) {
+		lu.Time = now.Truncate(time.Minute)
+		return nil
+	}
+
+	matches := reRelative.FindStringSubmatch(str)
+	if len(matches) >= 3 {
+		n := 1
+		if matches[1] != "" {
+			var err error
+			n, err = strconv.Atoi(matches[1])
+			if err != nil {
+				return err
+			}
+		}
+
+		unit := strings.ToLower(matches[2])
+		var d time.Duration
+		switch unit {
+		case "day", "days":
+			d = time.Hour * 24 * time.Duration(n)
+		case "hour", "hours":
+			d = time.Hour * time.Duration(n)
+		case "min", "mins":
+			d = time.Minute * time.Duration(n)
+		default:
+			return fmt.Errorf("unrecognized time unit: %s", unit)
+		}
+
+		lu.Time = now.Add(-d).Truncate(time.Minute)
+		return nil
+	}
+
+	return fmt.Errorf("invalid time format: %s", str)
+}
+
+// To support Equal comparison in tests
+func (lu LastUpdate) Equal(t time.Time) bool {
+	return lu.Time.Year() == t.Year() &&
+		lu.Time.Month() == t.Month() &&
+		lu.Time.Day() == t.Day() &&
+		lu.Time.Hour() == t.Hour() &&
+		lu.Time.Minute() == t.Minute()
 }
