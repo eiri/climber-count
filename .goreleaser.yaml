@@ -90,6 +90,8 @@ changelog:
       order: 999
 homebrew_casks:
   - name: climber-count
+    custom_block: |
+      name "Climber Count"
     hooks:
       post:
         install: |
