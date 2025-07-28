@@ -8,7 +8,7 @@ require (
 	github.com/enescakir/emoji v1.0.0
 	github.com/go-telegram/bot v1.16.0
 	github.com/imbue11235/humanize v1.0.2
-	github.com/reugn/go-quartz v0.14.0
+	github.com/reugn/go-quartz v0.15.0
 	golang.org/x/net v0.42.0
 	modernc.org/sqlite v1.38.0
 )
