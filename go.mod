@@ -6,7 +6,7 @@ toolchain go1.24.1
 
 require (
 	github.com/enescakir/emoji v1.0.0
-	github.com/go-telegram/bot v1.16.0
+	github.com/go-telegram/bot v1.17.0
 	github.com/imbue11235/humanize v1.0.2
 	github.com/reugn/go-quartz v0.15.1
 	golang.org/x/net v0.43.0
