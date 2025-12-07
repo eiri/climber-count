@@ -16,6 +16,10 @@ build: $(PROJECT)
 test:
 	go test -v ./...
 
+.PHONY: lint
+lint:
+	golangci-lint run -D errcheck ./...
+
 .PHONY: run
 run: $(PROJECT)
 	./$<
