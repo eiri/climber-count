@@ -18,7 +18,7 @@ test:
 
 .PHONY: lint
 lint:
-	golangci-lint run -D errcheck ./...
+	golangci-lint run ./...
 
 .PHONY: run
 run: $(PROJECT)

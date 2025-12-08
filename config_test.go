@@ -6,15 +6,21 @@ import (
 	"testing"
 )
 
-func setEnvVars(envVars map[string]string) {
+func setEnvVars(t *testing.T, envVars map[string]string) {
 	for key, value := range envVars {
-		os.Setenv(key, value)
+		err := os.Setenv(key, value)
+		if err != nil {
+			t.Fatalf("can't set env %q to value %q: %v", key, value, err)
+		}
 	}
 }
 
-func unsetEnvVars(envVars map[string]string) {
+func unsetEnvVars(t *testing.T, envVars map[string]string) {
 	for key := range envVars {
-		os.Unsetenv(key)
+		err := os.Unsetenv(key)
+		if err != nil {
+			t.Fatalf("can't unst env %q: %v", key, err)
+		}
 	}
 }
 
@@ -26,8 +32,8 @@ func TestNewConfig_AllVarsSet(t *testing.T) {
 		"BOT_TOKEN": "bot_token_value",
 		"STORAGE":   "storage_value",
 	}
-	setEnvVars(envVars)
-	defer unsetEnvVars(envVars)
+	setEnvVars(t, envVars)
+	defer unsetEnvVars(t, envVars)
 
 	cfg, err := NewConfig()
 	if err != nil {
@@ -55,8 +61,8 @@ func TestNewConfig_RequiredVarsNotSet(t *testing.T) {
 	envVars := map[string]string{
 		"STORAGE": "storage_value",
 	}
-	setEnvVars(envVars)
-	defer unsetEnvVars(envVars)
+	setEnvVars(t, envVars)
+	defer unsetEnvVars(t, envVars)
 
 	_, err := NewConfig()
 	if err == nil {
@@ -76,8 +82,8 @@ func TestNewConfig_OptionalVarNotSet(t *testing.T) {
 		"GYM":       "gym_value",
 		"BOT_TOKEN": "bot_token_value",
 	}
-	setEnvVars(envVars)
-	defer unsetEnvVars(envVars)
+	setEnvVars(t, envVars)
+	defer unsetEnvVars(t, envVars)
 
 	cfg, err := NewConfig()
 	if err != nil {
@@ -108,10 +114,13 @@ func TestNewConfig_NoEnvVar(t *testing.T) {
 		"GYM":       "gym_value",
 		"BOT_TOKEN": "bot_token_value",
 	}
-	setEnvVars(envVars)
-	defer unsetEnvVars(envVars)
+	setEnvVars(t, envVars)
+	defer unsetEnvVars(t, envVars)
 
-	os.Unsetenv("SCHEDULE")
+	err := os.Unsetenv("SCHEDULE")
+	if err != nil {
+		t.Fatalf("can't unst env %q: %v", "SCHEDULE", err)
+	}
 
 	cfg, err := NewConfig()
 	if err != nil {
@@ -131,8 +140,8 @@ func TestNewConfig_WithEnvVar(t *testing.T) {
 		"BOT_TOKEN": "bot_token_value",
 		"SCHEDULE":  "task1=0 */5 * * * MON-FRI|task2=* 12 * * * 2|task3=0 5 12,2 * * *",
 	}
-	setEnvVars(envVars)
-	defer unsetEnvVars(envVars)
+	setEnvVars(t, envVars)
+	defer unsetEnvVars(t, envVars)
 
 	expectedSchedule := map[string]string{
 		"task1": "0 */5 * * * MON-FRI",
@@ -158,8 +167,8 @@ func TestNewConfig_WithMalformedEnvVar(t *testing.T) {
 		"BOT_TOKEN": "bot_token_value",
 		"SCHEDULE":  "task1=0 */5 * * * MON-FRI|task2|task3=0 5 12,2 * * *",
 	}
-	setEnvVars(envVars)
-	defer unsetEnvVars(envVars)
+	setEnvVars(t, envVars)
+	defer unsetEnvVars(t, envVars)
 
 	expectedSchedule := map[string]string{
 		"task1": "0 */5 * * * MON-FRI",
