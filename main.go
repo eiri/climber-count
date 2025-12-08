@@ -54,7 +54,10 @@ func main() {
 	for key, crontab := range cfg.Schedule {
 		slog.Info("schedule job", "job_key", key, "crontab", crontab, "loc", loc)
 		cronTrigger, _ := quartz.NewCronTriggerWithLoc(crontab, loc)
-		sched.ScheduleJob(quartz.NewJobDetail(jh, quartz.NewJobKey(key)), cronTrigger)
+		err := sched.ScheduleJob(quartz.NewJobDetail(jh, quartz.NewJobKey(key)), cronTrigger)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	// shutdown sched on exit
 	defer func() {

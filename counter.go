@@ -100,9 +100,9 @@ func (lu *LastUpdate) UnmarshalJSON(data []byte) error {
 
 // To support Equal comparison in tests
 func (lu LastUpdate) Equal(t time.Time) bool {
-	return lu.Time.Year() == t.Year() &&
-		lu.Time.Month() == t.Month() &&
-		lu.Time.Day() == t.Day() &&
-		lu.Time.Hour() == t.Hour() &&
-		lu.Time.Minute() == t.Minute()
+	return lu.Year() == t.Year() &&
+		lu.Month() == t.Month() &&
+		lu.Day() == t.Day() &&
+		lu.Hour() == t.Hour() &&
+		lu.Minute() == t.Minute()
 }

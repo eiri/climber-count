@@ -210,12 +210,18 @@ func TestFetch(t *testing.T) {
 			}
 
 			if body != nil {
-				bodyBytes, _ := io.ReadAll(body)
+				bodyBytes, err := io.ReadAll(body)
+				if err != nil {
+					t.Errorf("unexpected error on reading a body: %q", err)
+				}
 				bodyStr := string(bodyBytes)
 				if bodyStr != tt.expectedBody {
 					t.Errorf("expected body %q but got %q", tt.expectedBody, bodyStr)
 				}
-				body.Close()
+				err = body.Close()
+				if err != nil {
+					t.Errorf("unexpected error on closing a body: %q", err)
+				}
 			}
 
 			// Check if the User-Agent header is set correctly
