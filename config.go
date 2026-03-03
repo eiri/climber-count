@@ -36,7 +36,7 @@ func NewConfig() (*Config, error) {
 	}
 
 	if val, ok := os.LookupEnv("SCHEDULE"); ok {
-		for _, subVal := range strings.Split(val, "|") {
+		for subVal := range strings.SplitSeq(val, "|") {
 			if strings.Contains(subVal, "=") {
 				kv := strings.SplitN(subVal, "=", 2)
 				cfg.Schedule[kv[0]] = kv[1]

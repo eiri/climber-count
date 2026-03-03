@@ -68,7 +68,7 @@ func main() {
 	opts := []bot.Option{
 		// just no-op
 		bot.WithDefaultHandler(func(ctx context.Context, b *bot.Bot, update *models.Update) {}),
-		bot.WithDebugHandler(func(format string, args ...interface{}) {
+		bot.WithDebugHandler(func(format string, args ...any) {
 			slog.Debug(fmt.Sprintf(format, args), "component", "telegram bot")
 		}),
 		bot.WithErrorsHandler(func(err error) {
