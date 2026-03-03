@@ -30,8 +30,8 @@ func readAllActions(db *sql.DB) ([][]string, error) {
 
 func TestNewGym(t *testing.T) {
 	dbPath := "test_gym.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	g, err := NewGym(dbPath)
 	if err != nil {
@@ -45,8 +45,8 @@ func TestNewGym(t *testing.T) {
 
 func TestGymIn(t *testing.T) {
 	dbPath := "test_gym.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	g, err := NewGym(dbPath)
 	if err != nil {
@@ -69,32 +69,24 @@ func TestGymIn(t *testing.T) {
 
 func TestGymOut(t *testing.T) {
 	dbPath := "test_gym.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	g, err := NewGym(dbPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if _, err := g.Out(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	actions, err := readAllActions(g.db)
-	if err != nil {
-		t.Fatalf("unexpected error reading actions: %v", err)
-	}
-
-	if len(actions) != 1 || actions[0][1] != "out" {
-		t.Errorf("expected 'out' action but got %v", actions)
+	// Out without a prior In should fail
+	if _, err := g.Out(); err == nil {
+		t.Fatal("expected error when calling Out without prior In, got nil")
 	}
 }
 
 func TestGymInAndOut(t *testing.T) {
 	dbPath := "test_gym.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	g, err := NewGym(dbPath)
 	if err != nil {
@@ -102,11 +94,11 @@ func TestGymInAndOut(t *testing.T) {
 	}
 
 	if err := g.In(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("unexpected error on In: %v", err)
 	}
 
 	if _, err := g.Out(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("unexpected error on Out: %v", err)
 	}
 
 	actions, err := readAllActions(g.db)
@@ -119,31 +111,106 @@ func TestGymInAndOut(t *testing.T) {
 	}
 }
 
-func TestOut_TimeDelta(t *testing.T) {
-	dbPath := "test_gym_time_delta.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+func TestGymIn_BlocksSecondInSameDay(t *testing.T) {
+	dbPath := "test_gym_double_in.sqlite"
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	g, err := NewGym(dbPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Perform an "in" action
 	if err := g.In(); err != nil {
+		t.Fatalf("unexpected error on first In: %v", err)
+	}
+
+	// Second In on same day (without Out) should be rejected
+	if err := g.In(); err == nil {
+		t.Fatal("expected error on second In same day without Out, got nil")
+	}
+}
+
+func TestGymIn_AllowsAfterOut(t *testing.T) {
+	dbPath := "test_gym_in_after_out.sqlite"
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
+
+	g, err := NewGym(dbPath)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Wait a bit to ensure a noticeable time delta
-	time.Sleep(2 * time.Second)
+	if err := g.In(); err != nil {
+		t.Fatalf("unexpected error on first In: %v", err)
+	}
 
-	// Perform an "out" action and capture the time delta
+	if _, err := g.Out(); err != nil {
+		t.Fatalf("unexpected error on Out: %v", err)
+	}
+
+	// In again after Out should be allowed
+	if err := g.In(); err != nil {
+		t.Fatalf("unexpected error on second In after Out: %v", err)
+	}
+
+	actions, err := readAllActions(g.db)
+	if err != nil {
+		t.Fatalf("unexpected error reading actions: %v", err)
+	}
+
+	if len(actions) != 3 || actions[0][1] != "in" || actions[1][1] != "out" || actions[2][1] != "in" {
+		t.Errorf("expected in/out/in sequence but got %v", actions)
+	}
+}
+
+func TestGymOut_BlocksDoubleOut(t *testing.T) {
+	dbPath := "test_gym_double_out.sqlite"
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
+
+	g, err := NewGym(dbPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if err := g.In(); err != nil {
+		t.Fatalf("unexpected error on In: %v", err)
+	}
+
+	if _, err := g.Out(); err != nil {
+		t.Fatalf("unexpected error on first Out: %v", err)
+	}
+
+	// Second Out without a new In should fail
+	if _, err := g.Out(); err == nil {
+		t.Fatal("expected error on second Out without In, got nil")
+	}
+}
+
+func TestOut_TimeDelta(t *testing.T) {
+	dbPath := "test_gym_time_delta.sqlite"
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
+
+	g, err := NewGym(dbPath)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Insert an "in" row with a known past timestamp directly, bypassing In()
+	inTime := time.Now().Add(-2 * time.Second).Format(time.RFC3339)
+	_, err = g.db.Exec("INSERT INTO gym (timestamp, action) VALUES (?, ?)", inTime, "in")
+	if err != nil {
+		t.Fatalf("unexpected error seeding 'in' row: %v", err)
+	}
+
 	timeDelta, err := g.Out()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	if timeDelta != "2 seconds ago" {
-		t.Errorf("expected time delta around 2s but got %s", timeDelta)
+		t.Errorf("expected '2 seconds ago' but got %s", timeDelta)
 	}
 }
