@@ -4,10 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
-	"strings"
 
-	"github.com/enescakir/emoji"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 )
@@ -64,92 +61,6 @@ func (bh *BotHandler) CountHandler(ctx context.Context, b *bot.Bot, update *mode
 	if counter, ok := bh.storage.Last(); ok {
 		b.SendMessage(ctx, bh.Message(b, update.Message.Chat.ID, counter.String()))
 	}
-}
-
-func (bh *BotHandler) PingHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	if update.Message == nil {
-		return
-	}
-
-	chatID := update.Message.Chat.ID
-	msgID := update.Message.ID
-
-	if update.Message.Text == "ping" {
-		msg := bh.Message(b, chatID, "On how many?")
-		msg.ReplyMarkup = &models.InlineKeyboardMarkup{
-			InlineKeyboard: [][]models.InlineKeyboardButton{
-				{
-					{Text: "10", CallbackData: "ping on 10"},
-					{Text: "20", CallbackData: "ping on 20"},
-					{Text: "30", CallbackData: "ping on 30"},
-				},
-			},
-		}
-		b.SendMessage(ctx, msg)
-		return
-	}
-
-	if update.Message.Text == "ping off" {
-		bh.storage.RemoveCallback()
-		b.SetMessageReaction(ctx, bh.Reaction(b, chatID, msgID, emoji.ThumbsUp.String()))
-		return
-	}
-
-	args := strings.Split(update.Message.Text, " ")
-	if len(args) != 3 || args[1] != "on" {
-		return
-	}
-
-	number, err := strconv.Atoi(args[2])
-	if err != nil {
-		bh.logger.Error("can't parse number", "msg", err)
-		b.SendMessage(ctx, bh.Message(b, chatID, "Please provide a valid number."))
-		return
-	}
-
-	bh.storage.SetCallback(func(c Counter) bool {
-		if c.Count <= number {
-			b.SendMessage(ctx, bh.Message(b, chatID, fmt.Sprintf("Hey, %s", c)))
-			return true
-		}
-		return false
-	})
-	b.SetMessageReaction(ctx, bh.Reaction(b, chatID, msgID, emoji.Handshake.String()))
-}
-
-func (bh *BotHandler) PingButtonHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	if update.CallbackQuery == nil {
-		return
-	}
-
-	b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
-		CallbackQueryID: update.CallbackQuery.ID,
-		ShowAlert:       false,
-	})
-
-	chatID := update.CallbackQuery.Message.Message.Chat.ID
-
-	args := strings.Split(update.CallbackQuery.Data, " ")
-	if len(args) != 3 || args[1] != "on" {
-		return
-	}
-
-	number, err := strconv.Atoi(args[2])
-	if err != nil {
-		bh.logger.Error("can't parse number", "msg", err)
-		return
-	}
-
-	bh.storage.SetCallback(func(c Counter) bool {
-		if c.Count <= number {
-			b.SendMessage(ctx, bh.Message(b, chatID, fmt.Sprintf("Hey, %s", c)))
-			return true
-		}
-		return false
-	})
-
-	msg := fmt.Sprintf("Ok, I'll ping you once there are %d people on the wall.", number)
-	b.SendMessage(ctx, bh.Message(b, chatID, msg))
 }
 
 func (bh *BotHandler) GymHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
