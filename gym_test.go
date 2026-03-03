@@ -1,29 +1,27 @@
 package main
 
 import (
-	"database/sql"
 	"os"
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
+	"github.com/cvilsmeier/sqinn-go/v2"
 )
 
 // Helper function to read all records from the SQLite database
-func readAllActions(db *sql.DB) ([][]string, error) {
-	rows, err := db.Query("SELECT timestamp, action FROM gym")
+func readAllActions(sq *sqinn.Sqinn) ([][]string, error) {
+	rows, err := sq.QueryRows(
+		"SELECT timestamp, action FROM gym",
+		nil,
+		[]byte{sqinn.ValString, sqinn.ValString},
+	)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var actions [][]string
-	for rows.Next() {
-		var timestamp, action string
-		if err := rows.Scan(&timestamp, &action); err != nil {
-			return nil, err
-		}
-		actions = append(actions, []string{timestamp, action})
+	for _, row := range rows {
+		actions = append(actions, []string{row[0].String, row[1].String})
 	}
 	return actions, nil
 }
@@ -37,6 +35,7 @@ func TestNewGym(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer g.Close()
 
 	if g == nil {
 		t.Fatalf("expected non-nil Gym instance")
@@ -52,6 +51,7 @@ func TestGymIn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer g.Close()
 
 	if err := g.In(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -76,6 +76,7 @@ func TestGymOut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer g.Close()
 
 	// Out without a prior In should fail
 	if _, err := g.Out(); err == nil {
@@ -92,6 +93,7 @@ func TestGymInAndOut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer g.Close()
 
 	if err := g.In(); err != nil {
 		t.Fatalf("unexpected error on In: %v", err)
@@ -120,6 +122,7 @@ func TestGymIn_BlocksSecondInSameDay(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer g.Close()
 
 	if err := g.In(); err != nil {
 		t.Fatalf("unexpected error on first In: %v", err)
@@ -140,6 +143,7 @@ func TestGymIn_AllowsAfterOut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer g.Close()
 
 	if err := g.In(); err != nil {
 		t.Fatalf("unexpected error on first In: %v", err)
@@ -173,6 +177,7 @@ func TestGymOut_BlocksDoubleOut(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer g.Close()
 
 	if err := g.In(); err != nil {
 		t.Fatalf("unexpected error on In: %v", err)
@@ -197,10 +202,18 @@ func TestOut_TimeDelta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer g.Close()
 
 	// Insert an "in" row with a known past timestamp directly, bypassing In()
 	inTime := time.Now().Add(-2 * time.Second).Format(time.RFC3339)
-	_, err = g.db.Exec("INSERT INTO gym (timestamp, action) VALUES (?, ?)", inTime, "in")
+	err = g.db.ExecParams(
+		"INSERT INTO gym (timestamp, action) VALUES (?, ?)",
+		1, 2,
+		[]sqinn.Value{
+			sqinn.StringValue(inTime),
+			sqinn.StringValue("in"),
+		},
+	)
 	if err != nil {
 		t.Fatalf("unexpected error seeding 'in' row: %v", err)
 	}

@@ -1,45 +1,47 @@
 package main
 
 import (
-	"database/sql"
 	"os"
 	"reflect"
 	"strconv"
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
+	"github.com/cvilsmeier/sqinn-go/v2"
 )
 
 // Helper function to read all records from the SQLite database
-func readAllRecords(db *sql.DB) ([][]string, error) {
-	rows, err := db.Query("SELECT count, capacity, last_update FROM count")
+func readAllRecords(sq *sqinn.Sqinn) ([][]string, error) {
+	rows, err := sq.QueryRows(
+		"SELECT count, capacity, last_update FROM count",
+		nil,
+		[]byte{sqinn.ValInt32, sqinn.ValInt32, sqinn.ValString},
+	)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var records [][]string
-	for rows.Next() {
-		var count, capacity int
-		var lastUpdate string
-		if err := rows.Scan(&count, &capacity, &lastUpdate); err != nil {
-			return nil, err
-		}
-		records = append(records, []string{strconv.Itoa(count), strconv.Itoa(capacity), lastUpdate})
+	for _, row := range rows {
+		records = append(records, []string{
+			strconv.Itoa(int(row[0].Int32)),
+			strconv.Itoa(int(row[1].Int32)),
+			row[2].String,
+		})
 	}
 	return records, nil
 }
 
 func TestNewStorage(t *testing.T) {
 	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	st, err := NewStorage(dbPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer st.Close()
 
 	if st == nil {
 		t.Fatalf("expected non-nil Storage instance")
@@ -48,13 +50,14 @@ func TestNewStorage(t *testing.T) {
 
 func TestStore(t *testing.T) {
 	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	st, err := NewStorage(dbPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer st.Close()
 
 	counter := Counter{
 		Count:    1,
@@ -84,13 +87,14 @@ func TestStore(t *testing.T) {
 
 func TestStore_Append(t *testing.T) {
 	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	st, err := NewStorage(dbPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer st.Close()
 
 	counters := []Counter{
 		{
@@ -132,13 +136,14 @@ func TestStore_Append(t *testing.T) {
 
 func TestLast(t *testing.T) {
 	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	st, err := NewStorage(dbPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer st.Close()
 
 	counter1 := Counter{
 		Count:    1,
@@ -168,7 +173,6 @@ func TestLast(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected last counter to be found")
 	}
-
 	expectedCounter := counter2
 
 	if !reflect.DeepEqual(lastCounter, expectedCounter) {
@@ -178,13 +182,14 @@ func TestLast(t *testing.T) {
 
 func TestLast_EmptyStorage(t *testing.T) {
 	dbPath := "test_empty_storage.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	st, err := NewStorage(dbPath)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer st.Close()
 
 	_, ok := st.Last()
 	if ok {
