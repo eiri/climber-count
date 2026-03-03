@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/imbue11235/humanize"
@@ -37,31 +38,55 @@ func NewGym(dbPath string) (*Gym, error) {
 
 // In writes an "in" action with the current timestamp to the database.
 func (g *Gym) In() error {
+	last, lastTs, err := g.lastAction()
+	if err != nil {
+		return err
+	}
+
+	if last == "in" {
+		now := time.Now()
+		sameDay := lastTs.Year() == now.Year() && lastTs.YearDay() == now.YearDay()
+		if sameDay {
+			return errors.New("cannot check in: already checked in without checking out")
+		}
+	}
+
 	return g.writeAction("in")
 }
 
 // Out writes an "out" action with the current timestamp to the database and returns the time delta since the latest "in" action.
 func (g *Gym) Out() (string, error) {
-	var lastInTimestampStr string
-	err := g.db.QueryRow("SELECT timestamp FROM gym WHERE action = 'in' ORDER BY timestamp DESC LIMIT 1").Scan(&lastInTimestampStr)
-	if err != nil && err != sql.ErrNoRows {
-		return "", err
-	}
-
-	var lastInTimestamp time.Time
-	if lastInTimestampStr != "" {
-		lastInTimestamp, err = time.Parse(time.RFC3339, lastInTimestampStr)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	err = g.writeAction("out")
+	last, lastTs, err := g.lastAction()
 	if err != nil {
 		return "", err
 	}
+	if last != "in" {
+		return "", errors.New("cannot check out: no active check-in")
+	}
 
-	return humanize.ExactTime(lastInTimestamp).FromNow(), nil
+	if err = g.writeAction("out"); err != nil {
+		return "", err
+	}
+
+	return humanize.ExactTime(lastTs).FromNow(), nil
+}
+
+func (g *Gym) lastAction() (string, time.Time, error) {
+	var action, timestampStr string
+	err := g.db.QueryRow("SELECT action, timestamp FROM gym ORDER BY timestamp DESC, id DESC LIMIT 1").Scan(&action, &timestampStr)
+	if err == sql.ErrNoRows {
+		return "", time.Time{}, nil
+	}
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	ts, err := time.Parse(time.RFC3339, timestampStr)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	return action, ts, nil
 }
 
 func (g *Gym) writeAction(action string) error {
