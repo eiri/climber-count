@@ -8,15 +8,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// CallbackFunc is a function that called during Store if set. If the function returns `true` it is unset by Storer.
-type CallbackFunc func(Counter) bool
-
 // Storer interface with a single Store method
 type Storer interface {
 	Store(counter Counter) error
 	Last() (Counter, bool)
-	SetCallback(CallbackFunc)
-	RemoveCallback()
 	NewGym() error
 	GetGym() *Gym
 }
@@ -25,7 +20,6 @@ type Storer interface {
 type Storage struct {
 	filePath string
 	db       *sql.DB
-	callback CallbackFunc
 	gym      *Gym
 }
 
@@ -52,16 +46,6 @@ func NewStorage(filePath string) (*Storage, error) {
 	return &Storage{db: db, filePath: filePath}, nil
 }
 
-// SetCallback sets a callback function that will be only called once
-func (s *Storage) SetCallback(cb CallbackFunc) {
-	s.callback = cb
-}
-
-// RemoveCallback removes the callback function from Storage
-func (s *Storage) RemoveCallback() {
-	s.callback = nil
-}
-
 // NewGym initializes and stores the Gym instance using the Storage's file path.
 // It returns an error if the Gym instance cannot be created.
 func (s *Storage) NewGym() error {
@@ -78,14 +62,6 @@ func (s *Storage) GetGym() *Gym {
 // Store stores the given counter in the storage table
 func (s *Storage) Store(counter Counter) error {
 	logger := slog.Default().With("component", "storage")
-
-	// Call callback if set
-	if s.callback != nil {
-		done := s.callback(counter)
-		if done {
-			s.callback = nil
-		}
-	}
 
 	// Check for deduplication
 	var lastUpdate string
