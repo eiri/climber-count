@@ -11,7 +11,6 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// Helper function to read all records from the SQLite database
 func readAllRecords(db *sql.DB) ([][]string, error) {
 	rows, err := db.Query("SELECT count, capacity, last_update FROM count")
 	if err != nil {
@@ -33,8 +32,8 @@ func readAllRecords(db *sql.DB) ([][]string, error) {
 
 func TestNewStorage(t *testing.T) {
 	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	st, err := NewStorage(dbPath)
 	if err != nil {
@@ -48,8 +47,8 @@ func TestNewStorage(t *testing.T) {
 
 func TestStore(t *testing.T) {
 	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	st, err := NewStorage(dbPath)
 	if err != nil {
@@ -84,8 +83,8 @@ func TestStore(t *testing.T) {
 
 func TestStore_Append(t *testing.T) {
 	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	st, err := NewStorage(dbPath)
 	if err != nil {
@@ -132,8 +131,8 @@ func TestStore_Append(t *testing.T) {
 
 func TestLast(t *testing.T) {
 	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	st, err := NewStorage(dbPath)
 	if err != nil {
@@ -178,8 +177,8 @@ func TestLast(t *testing.T) {
 
 func TestLast_EmptyStorage(t *testing.T) {
 	dbPath := "test_empty_storage.sqlite"
-	os.Remove(dbPath)       // Ensure the file does not exist before testing
-	defer os.Remove(dbPath) // Clean up after test
+	os.Remove(dbPath)
+	defer os.Remove(dbPath)
 
 	st, err := NewStorage(dbPath)
 	if err != nil {
@@ -189,5 +188,31 @@ func TestLast_EmptyStorage(t *testing.T) {
 	_, ok := st.Last()
 	if ok {
 		t.Fatalf("expected no last counter in empty storage")
+	}
+}
+
+func TestGetGym_BeforeNewGym(t *testing.T) {
+	dbPath := t.TempDir() + "/test.sqlite"
+	st, err := NewStorage(dbPath)
+	if err != nil {
+		t.Fatalf("NewStorage: %v", err)
+	}
+	// gym is nil until NewGym is called.
+	if g := st.GetGym(); g != nil {
+		t.Errorf("expected nil Gym before NewGym, got %v", g)
+	}
+}
+
+func TestGetGym_AfterNewGym(t *testing.T) {
+	dbPath := t.TempDir() + "/test.sqlite"
+	st, err := NewStorage(dbPath)
+	if err != nil {
+		t.Fatalf("NewStorage: %v", err)
+	}
+	if err := st.NewGym(); err != nil {
+		t.Fatalf("NewGym: %v", err)
+	}
+	if g := st.GetGym(); g == nil {
+		t.Error("expected non-nil Gym after NewGym")
 	}
 }
