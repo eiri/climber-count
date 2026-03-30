@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,7 +11,6 @@ import (
 	"golang.org/x/net/html"
 )
 
-// Mocked HTTP Client
 type MockClient struct {
 	resp *http.Response
 	err  error
@@ -18,8 +18,27 @@ type MockClient struct {
 }
 
 func (m *MockClient) Do(req *http.Request) (*http.Response, error) {
-	m.req = req // Save the request for inspection
+	m.req = req
 	return m.resp, m.err
+}
+
+// roundTripFunc lets a plain function satisfy http.RoundTripper.
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// minimalOccupancyHTML returns a minimal HTML page whose <script> block
+// contains an occupancy data object for the given gym key.
+func minimalOccupancyHTML(key string, count, capacity int) string {
+	return fmt.Sprintf(`<!DOCTYPE html><html><body><script>
+var data = {
+  '%s' : {
+    'capacity' : %d,
+    'count' : %d,
+    'subLabel' : 'Current climber count',
+    'lastUpdate' : 'Last updated:&nbspnow  (10:00 AM)'
+  },    };
+</script></body></html>`, key, capacity, count)
 }
 
 func TestExtract(t *testing.T) {
@@ -229,5 +248,92 @@ func TestFetch(t *testing.T) {
 				t.Errorf("expected User-Agent %q but got %q", USER_AGENT, userAgent)
 			}
 		})
+	}
+}
+
+func TestClientRoundTripper_RoundTrip(t *testing.T) {
+	original := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = original })
+
+	http.DefaultTransport = roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("ok")),
+		}, nil
+	})
+
+	crt := ClientRoundTripper{}
+	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	resp, err := crt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestClientRoundTripper_RoundTrip_Error(t *testing.T) {
+	original := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = original })
+
+	http.DefaultTransport = roundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return nil, errors.New("dial error")
+	})
+
+	crt := ClientRoundTripper{}
+	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	_, err := crt.RoundTrip(req)
+	if err == nil {
+		t.Fatal("expected error from RoundTrip, got nil")
+	}
+}
+
+func TestCounters_Success(t *testing.T) {
+	page := minimalOccupancyHTML("TST", 5, 50)
+
+	cfg := &Config{PGK: "pgk", FID: "fid"}
+	c := NewClient(cfg)
+	c.client = &MockClient{
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(page)),
+		},
+	}
+
+	counters, err := c.Counters()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if counters == nil {
+		t.Fatal("expected non-nil Counters")
+	}
+}
+
+func TestCounters_FetchError(t *testing.T) {
+	cfg := &Config{PGK: "pgk", FID: "fid"}
+	c := NewClient(cfg)
+	c.client = &MockClient{err: errors.New("network error")}
+
+	_, err := c.Counters()
+	if err == nil {
+		t.Fatal("expected error when fetch fails")
+	}
+}
+
+func TestCounters_NoOccupancyData(t *testing.T) {
+	// Valid HTTP response but no occupancy script block — parse() returns ""
+	cfg := &Config{PGK: "pgk", FID: "fid"}
+	c := NewClient(cfg)
+	c.client = &MockClient{
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader("<html><body>no data</body></html>")),
+		},
+	}
+
+	_, err := c.Counters()
+	if err == nil {
+		t.Fatal("expected error when page contains no occupancy data")
 	}
 }
