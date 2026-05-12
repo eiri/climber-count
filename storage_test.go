@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
@@ -31,26 +31,59 @@ func readAllRecords(db *sql.DB) ([][]string, error) {
 }
 
 func TestNewStorage(t *testing.T) {
-	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)
-	defer os.Remove(dbPath)
-
-	st, err := NewStorage(dbPath)
+	dir := t.TempDir()
+	st, err := NewStorage(dir, "TST")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	if st == nil {
-		t.Fatalf("expected non-nil Storage instance")
+		t.Fatal("expected non-nil Storage instance")
+	}
+	want := filepath.Join(dir, "tst.db")
+	if st.filePath != want {
+		t.Errorf("expected filePath %q, got %q", want, st.filePath)
+	}
+}
+
+func TestNewStorage_CreatesDir(t *testing.T) {
+	base := t.TempDir()
+	dir := filepath.Join(base, "sub", "storage")
+	st, err := NewStorage(dir, "TSB")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if st == nil {
+		t.Fatal("expected non-nil Storage instance")
+	}
+	want := filepath.Join(dir, "tsb.db")
+	if st.filePath != want {
+		t.Errorf("expected filePath %q, got %q", want, st.filePath)
+	}
+}
+
+func TestNewStorage_GymNameLowercased(t *testing.T) {
+	dir := t.TempDir()
+	cases := []struct {
+		gym  string
+		want string
+	}{
+		{"SLB", "slb.db"},
+		{"sbg", "sbg.db"},
+		{"MiXeD", "mixed.db"},
+	}
+	for _, tc := range cases {
+		st, err := NewStorage(dir, tc.gym)
+		if err != nil {
+			t.Fatalf("gym %q: unexpected error: %v", tc.gym, err)
+		}
+		if got := filepath.Base(st.filePath); got != tc.want {
+			t.Errorf("gym %q: expected file %q, got %q", tc.gym, tc.want, got)
+		}
 	}
 }
 
 func TestStore(t *testing.T) {
-	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)
-	defer os.Remove(dbPath)
-
-	st, err := NewStorage(dbPath)
+	st, err := NewStorage(t.TempDir(), "TST")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -62,7 +95,6 @@ func TestStore(t *testing.T) {
 			Time: time.Date(2024, time.May, 30, 10, 0, 0, 0, time.UTC),
 		},
 	}
-
 	if err := st.Store(counter); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,18 +107,13 @@ func TestStore(t *testing.T) {
 	expectedRecords := [][]string{
 		{"1", "100", "2024-05-30T10:00:00Z"},
 	}
-
 	if !reflect.DeepEqual(records, expectedRecords) {
 		t.Errorf("expected records %v but got %v", expectedRecords, records)
 	}
 }
 
 func TestStore_Append(t *testing.T) {
-	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)
-	defer os.Remove(dbPath)
-
-	st, err := NewStorage(dbPath)
+	st, err := NewStorage(t.TempDir(), "TST")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -107,7 +134,6 @@ func TestStore_Append(t *testing.T) {
 			},
 		},
 	}
-
 	for _, counter := range counters {
 		if err := st.Store(counter); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -123,18 +149,13 @@ func TestStore_Append(t *testing.T) {
 		{"1", "100", "2024-05-30T10:00:00Z"},
 		{"2", "200", "2024-06-01T10:00:00Z"},
 	}
-
 	if !reflect.DeepEqual(records, expectedRecords) {
 		t.Errorf("expected records %v but got %v", expectedRecords, records)
 	}
 }
 
 func TestLast(t *testing.T) {
-	dbPath := "test_storage.sqlite"
-	os.Remove(dbPath)
-	defer os.Remove(dbPath)
-
-	st, err := NewStorage(dbPath)
+	st, err := NewStorage(t.TempDir(), "TST")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -146,7 +167,6 @@ func TestLast(t *testing.T) {
 			Time: time.Date(2024, time.May, 30, 10, 0, 0, 0, time.UTC),
 		},
 	}
-
 	counter2 := Counter{
 		Count:    2,
 		Capacity: 200,
@@ -158,54 +178,43 @@ func TestLast(t *testing.T) {
 	if err := st.Store(counter1); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	if err := st.Store(counter2); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	lastCounter, ok := st.Last()
 	if !ok {
-		t.Fatalf("expected last counter to be found")
+		t.Fatal("expected last counter to be found")
 	}
-
-	expectedCounter := counter2
-
-	if !reflect.DeepEqual(lastCounter, expectedCounter) {
-		t.Errorf("expected last counter %v but got %v", expectedCounter, lastCounter)
+	if !reflect.DeepEqual(lastCounter, counter2) {
+		t.Errorf("expected last counter %v but got %v", counter2, lastCounter)
 	}
 }
 
 func TestLast_EmptyStorage(t *testing.T) {
-	dbPath := "test_empty_storage.sqlite"
-	os.Remove(dbPath)
-	defer os.Remove(dbPath)
-
-	st, err := NewStorage(dbPath)
+	st, err := NewStorage(t.TempDir(), "TST")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	_, ok := st.Last()
 	if ok {
-		t.Fatalf("expected no last counter in empty storage")
+		t.Fatal("expected no last counter in empty storage")
 	}
 }
 
 func TestGetGym_BeforeNewGym(t *testing.T) {
-	dbPath := t.TempDir() + "/test.sqlite"
-	st, err := NewStorage(dbPath)
+	st, err := NewStorage(t.TempDir(), "TST")
 	if err != nil {
 		t.Fatalf("NewStorage: %v", err)
 	}
-	// gym is nil until NewGym is called.
 	if g := st.GetGym(); g != nil {
 		t.Errorf("expected nil Gym before NewGym, got %v", g)
 	}
 }
 
 func TestGetGym_AfterNewGym(t *testing.T) {
-	dbPath := t.TempDir() + "/test.sqlite"
-	st, err := NewStorage(dbPath)
+	st, err := NewStorage(t.TempDir(), "TST")
 	if err != nil {
 		t.Fatalf("NewStorage: %v", err)
 	}
@@ -214,5 +223,44 @@ func TestGetGym_AfterNewGym(t *testing.T) {
 	}
 	if g := st.GetGym(); g == nil {
 		t.Error("expected non-nil Gym after NewGym")
+	}
+}
+
+// TestMultipleGyms verifies that two gyms stored under the same dir
+// produce separate files and independent data.
+func TestMultipleGyms(t *testing.T) {
+	dir := t.TempDir()
+
+	stSLB, err := NewStorage(dir, "SLB")
+	if err != nil {
+		t.Fatalf("SLB storage: %v", err)
+	}
+	stSBG, err := NewStorage(dir, "SBG")
+	if err != nil {
+		t.Fatalf("SBG storage: %v", err)
+	}
+
+	cSLB := Counter{Count: 10, Capacity: 50, LastUpdate: LastUpdate{Time: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}}
+	cSBG := Counter{Count: 99, Capacity: 200, LastUpdate: LastUpdate{Time: time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)}}
+
+	if err := stSLB.Store(cSLB); err != nil {
+		t.Fatalf("store SLB: %v", err)
+	}
+	if err := stSBG.Store(cSBG); err != nil {
+		t.Fatalf("store SBG: %v", err)
+	}
+
+	gotSLB, ok := stSLB.Last()
+	if !ok || gotSLB.Count != 10 {
+		t.Errorf("SLB: expected count 10, got %+v (ok=%v)", gotSLB, ok)
+	}
+	gotSBG, ok := stSBG.Last()
+	if !ok || gotSBG.Count != 99 {
+		t.Errorf("SBG: expected count 99, got %+v (ok=%v)", gotSBG, ok)
+	}
+
+	// Confirm two separate files exist.
+	if stSLB.filePath == stSBG.filePath {
+		t.Error("SLB and SBG share the same file path")
 	}
 }

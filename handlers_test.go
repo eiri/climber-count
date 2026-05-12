@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -51,21 +52,25 @@ func (e *errStorer) Store(_ Counter) error { return errors.New("store failed") }
 
 func TestNewJobHandler(t *testing.T) {
 	cfg := &Config{PGK: "pgk", FID: "fid"}
-	jh := NewJobHandler("TST", NewClient(cfg), newStubStorer(t))
+	storers := map[string]Storer{"TST": newStubStorer(t)}
+	jh := NewJobHandler(t.TempDir(), NewClient(cfg), storers)
 	if jh == nil {
 		t.Fatal("expected non-nil JobHandler")
 	}
-	if jh.gym != "TST" {
-		t.Errorf("expected gym %q, got %q", "TST", jh.gym)
+	if len(jh.storers) != 1 {
+		t.Errorf("expected 1 storer, got %d", len(jh.storers))
 	}
 }
 
 func TestJobHandler_Description(t *testing.T) {
 	cfg := &Config{PGK: "pgk", FID: "fid"}
-	jh := NewJobHandler("TST", NewClient(cfg), newStubStorer(t))
-
+	storers := map[string]Storer{
+		"TST": newStubStorer(t),
+		"SLB": newStubStorer(t),
+	}
+	jh := NewJobHandler(t.TempDir(), NewClient(cfg), storers)
 	got := jh.Description()
-	want := `Climber Count Job for "TST"`
+	want := "Climber Count Job for 2 gym(s)"
 	if got != want {
 		t.Errorf("expected %q, got %q", want, got)
 	}
@@ -73,7 +78,6 @@ func TestJobHandler_Description(t *testing.T) {
 
 func TestJobHandler_Execute_Success(t *testing.T) {
 	page := minimalOccupancyHTML("TST", 3, 30)
-
 	cfg := &Config{PGK: "pgk", FID: "fid"}
 	c := NewClient(cfg)
 	c.client = &MockClient{
@@ -84,7 +88,8 @@ func TestJobHandler_Execute_Success(t *testing.T) {
 	}
 
 	st := newStubStorer(t)
-	jh := NewJobHandler("TST", c, st)
+	storers := map[string]Storer{"TST": st}
+	jh := NewJobHandler(t.TempDir(), c, storers)
 
 	if err := jh.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -94,20 +99,12 @@ func TestJobHandler_Execute_Success(t *testing.T) {
 	}
 }
 
-func TestJobHandler_Execute_FetchError(t *testing.T) {
-	cfg := &Config{PGK: "pgk", FID: "fid"}
-	c := NewClient(cfg)
-	c.client = &MockClient{err: errors.New("network down")}
-
-	jh := NewJobHandler("TST", c, newStubStorer(t))
-	if err := jh.Execute(context.Background()); err == nil {
-		t.Fatal("expected error when fetch fails")
-	}
-}
-
-func TestJobHandler_Execute_StoreError(t *testing.T) {
-	page := minimalOccupancyHTML("TST", 3, 30)
-
+func TestJobHandler_Execute_MultipleGyms(t *testing.T) {
+	// Page contains two gyms: TST and SLB.
+	page := multiGymOccupancyHTML(map[string][2]int{
+		"TST": {3, 30},
+		"SLB": {12, 50},
+	})
 	cfg := &Config{PGK: "pgk", FID: "fid"}
 	c := NewClient(cfg)
 	c.client = &MockClient{
@@ -117,7 +114,48 @@ func TestJobHandler_Execute_StoreError(t *testing.T) {
 		},
 	}
 
-	jh := NewJobHandler("TST", c, &errStorer{})
+	stTST := newStubStorer(t)
+	stSLB := newStubStorer(t)
+	storers := map[string]Storer{
+		"TST": stTST,
+		"SLB": stSLB,
+	}
+	jh := NewJobHandler(t.TempDir(), c, storers)
+
+	if err := jh.Execute(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(stTST.stored) != 1 {
+		t.Errorf("TST: expected 1 stored counter, got %d", len(stTST.stored))
+	}
+	if len(stSLB.stored) != 1 {
+		t.Errorf("SLB: expected 1 stored counter, got %d", len(stSLB.stored))
+	}
+}
+
+func TestJobHandler_Execute_FetchError(t *testing.T) {
+	cfg := &Config{PGK: "pgk", FID: "fid"}
+	c := NewClient(cfg)
+	c.client = &MockClient{err: errors.New("network down")}
+	storers := map[string]Storer{"TST": newStubStorer(t)}
+	jh := NewJobHandler(t.TempDir(), c, storers)
+	if err := jh.Execute(context.Background()); err == nil {
+		t.Fatal("expected error when fetch fails")
+	}
+}
+
+func TestJobHandler_Execute_StoreError(t *testing.T) {
+	page := minimalOccupancyHTML("TST", 3, 30)
+	cfg := &Config{PGK: "pgk", FID: "fid"}
+	c := NewClient(cfg)
+	c.client = &MockClient{
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(page)),
+		},
+	}
+	storers := map[string]Storer{"TST": &errStorer{}}
+	jh := NewJobHandler(t.TempDir(), c, storers)
 	if err := jh.Execute(context.Background()); err == nil {
 		t.Fatal("expected error when storage fails")
 	}
@@ -167,7 +205,6 @@ func TestBotHandler_Reaction(t *testing.T) {
 
 func TestBotHandler_CountHandler_NilMessage(t *testing.T) {
 	bh := NewBotHandler(newStubStorer(t))
-	// Guard clause: returns immediately when Message is nil — must not panic.
 	bh.CountHandler(context.Background(), &bot.Bot{}, &models.Update{})
 }
 
@@ -177,10 +214,6 @@ func TestBotHandler_CountHandler_WithStoredCounter(t *testing.T) {
 		{Count: 5, Capacity: 50, LastUpdate: LastUpdate{Time: time.Now()}},
 	}
 	bh := NewBotHandler(st)
-
-	// bot.Bot requires a live Telegram token to call SendMessage
-	// recover from the nil-pointer panic so we still can verify
-	// the handler reaches the SendMessage call path.
 	//nolint:errcheck
 	defer func() { recover() }()
 	bh.CountHandler(context.Background(), &bot.Bot{}, &models.Update{
@@ -204,6 +237,24 @@ func TestBotHandler_GymHandler_WithMessage(t *testing.T) {
 
 func TestBotHandler_GymButtonHandler_NilCallbackQuery(t *testing.T) {
 	bh := NewBotHandler(newStubStorer(t))
-	// Guard clause: returns immediately when CallbackQuery is nil.
 	bh.GymButtonHandler(context.Background(), &bot.Bot{}, &models.Update{})
 }
+
+// multiGymOccupancyHTML builds a minimal rockgympro HTML page containing
+// multiple gym entries, used by multi-gym Execute tests.
+func multiGymOccupancyHTML(gyms map[string][2]int) string {
+	var sb strings.Builder
+	sb.WriteString("<!DOCTYPE html><html><body><script>\nvar data = {\n")
+	for key, vals := range gyms {
+		sb.WriteString("'" + key + "' : {")
+		sb.WriteString("'capacity' : " + itoa(vals[1]) + ",")
+		sb.WriteString("'count' : " + itoa(vals[0]) + ",")
+		sb.WriteString("'subLabel' : 'Current climber count',")
+		sb.WriteString("'lastUpdate' : 'Last updated:&nbspnow (10:00 AM)'")
+		sb.WriteString("},\n")
+	}
+	sb.WriteString("};\n</script></body></html>")
+	return sb.String()
+}
+
+func itoa(n int) string { return strconv.Itoa(n) }

@@ -10,34 +10,44 @@ import (
 )
 
 type JobHandler struct {
-	gym     string
-	client  *Client
-	storage Storer
+	storageDir string
+	client     *Client
+	storers    map[string]Storer
 }
 
-func NewJobHandler(gym string, client *Client, storage Storer) *JobHandler {
+func NewJobHandler(storageDir string, client *Client, storers map[string]Storer) *JobHandler {
 	return &JobHandler{
-		gym:     gym,
-		client:  client,
-		storage: storage,
+		storageDir: storageDir,
+		client:     client,
+		storers:    storers,
 	}
 }
 
 func (jh *JobHandler) Execute(ctx context.Context) error {
 	logger := slog.Default().With("component", "cron handler")
+
 	counters, err := jh.client.Counters()
 	if err != nil {
 		logger.Error("can't get counters from client", "msg", err)
 		return err
 	}
 
-	counter := counters.Counter(jh.gym)
-	logger.Info("got counter from client", "counter", counter)
-	return jh.storage.Store(counter)
+	var firstErr error
+	for gym, storer := range jh.storers {
+		counter := counters.Counter(gym)
+		logger.Info("got counter from client", "gym", gym, "counter", counter)
+		if err := storer.Store(counter); err != nil {
+			logger.Error("failed to store counter", "gym", gym, "msg", err)
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
+	}
+	return firstErr
 }
 
 func (jh *JobHandler) Description() string {
-	return fmt.Sprintf("Climber Count Job for %q", jh.gym)
+	return fmt.Sprintf("Climber Count Job for %d gym(s)", len(jh.storers))
 }
 
 type BotHandler struct {
@@ -57,7 +67,6 @@ func (bh *BotHandler) CountHandler(ctx context.Context, b *bot.Bot, update *mode
 	if update.Message == nil {
 		return
 	}
-
 	if counter, ok := bh.storage.Last(); ok {
 		b.SendMessage(ctx, bh.Message(b, update.Message.Chat.ID, counter.String()))
 	}
@@ -67,9 +76,7 @@ func (bh *BotHandler) GymHandler(ctx context.Context, b *bot.Bot, update *models
 	if update.Message == nil {
 		return
 	}
-
 	chatID := update.Message.Chat.ID
-
 	msg := bh.Message(b, chatID, "Going into the gym?")
 	msg.ReplyMarkup = &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
