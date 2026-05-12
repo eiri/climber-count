@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"strings"
 	"time"
 
 	"github.com/go-telegram/bot"
@@ -48,22 +47,8 @@ func main() {
 		log.Fatal("no gyms found in scraped data")
 	}
 
-	// The configured GYM drives the Telegram bot responses.
-	botStorage, ok := storers[cfg.Gym]
-	if !ok {
-		// Fallback: use the first storer (shouldn't happen in normal operation).
-		slog.Warn("configured GYM not found in scraped data, falling back",
-			"gym", cfg.Gym,
-			"available", gymKeys(storers),
-		)
-		for _, s := range storers {
-			botStorage = s
-			break
-		}
-	}
-
 	jh := NewJobHandler(cfg.Storage, client, storers)
-	bh := NewBotHandler(botStorage)
+	bh := NewBotHandler(cfg.Gym, storers)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -109,17 +94,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	b.RegisterHandler(bot.HandlerTypeMessageText, "/count", bot.MatchTypeExact, bh.CountHandler)
+	b.RegisterHandler(bot.HandlerTypeMessageText, "/count", bot.MatchTypePrefix, bh.CountHandler)
 	b.RegisterHandler(bot.HandlerTypeMessageText, "/gym", bot.MatchTypeExact, bh.GymHandler)
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, "gym", bot.MatchTypePrefix, bh.GymButtonHandler)
 
 	b.Start(ctx)
-}
-
-func gymKeys(m map[string]Storer) string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return strings.Join(keys, ", ")
 }

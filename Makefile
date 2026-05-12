@@ -14,7 +14,7 @@ build: $(PROJECT)
 
 .PHONY: test
 test:
-	go test -v ./...
+	go test ./...
 
 .PHONY: lint
 lint:

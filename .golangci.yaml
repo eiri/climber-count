@@ -3,6 +3,11 @@ linters:
   default: standard
 
   settings:
+    staticcheck:
+        checks:
+            - all
+            - '-ST1003'
+
     errcheck:
       exclude-functions:
         - "(io.Closer).Close"

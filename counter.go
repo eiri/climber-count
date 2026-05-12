@@ -98,7 +98,7 @@ func (lu *LastUpdate) UnmarshalJSON(data []byte) error {
 	return fmt.Errorf("invalid time format: %s", str)
 }
 
-// To support Equal comparison in tests
+// Equal helper added to support equality comparison in tests
 func (lu LastUpdate) Equal(t time.Time) bool {
 	return lu.Year() == t.Year() &&
 		lu.Month() == t.Month() &&
