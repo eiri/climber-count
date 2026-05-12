@@ -14,7 +14,7 @@ type Gym struct {
 	db *sql.DB
 }
 
-// New creates a new Gym instance with the given SQLite database path.
+// NewGym creates a new Gym instance with the given SQLite database path.
 func NewGym(dbPath string) (*Gym, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {

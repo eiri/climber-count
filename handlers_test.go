@@ -161,15 +161,21 @@ func TestJobHandler_Execute_StoreError(t *testing.T) {
 	}
 }
 
+func newBotHandler(t *testing.T) *BotHandler {
+	t.Helper()
+	st := newStubStorer(t)
+	return NewBotHandler("TST", map[string]Storer{"TST": st})
+}
+
 func TestNewBotHandler(t *testing.T) {
-	bh := NewBotHandler(newStubStorer(t))
+	bh := newBotHandler(t)
 	if bh == nil {
 		t.Fatal("expected non-nil BotHandler")
 	}
 }
 
 func TestBotHandler_Message(t *testing.T) {
-	bh := NewBotHandler(newStubStorer(t))
+	bh := newBotHandler(t)
 	params := bh.Message(nil, 42, "hello")
 	if params == nil {
 		t.Fatal("Message returned nil")
@@ -183,7 +189,7 @@ func TestBotHandler_Message(t *testing.T) {
 }
 
 func TestBotHandler_Reaction(t *testing.T) {
-	bh := NewBotHandler(newStubStorer(t))
+	bh := newBotHandler(t)
 	params := bh.Reaction(nil, 99, 7, "👍")
 	if params == nil {
 		t.Fatal("Reaction returned nil")
@@ -204,7 +210,7 @@ func TestBotHandler_Reaction(t *testing.T) {
 }
 
 func TestBotHandler_CountHandler_NilMessage(t *testing.T) {
-	bh := NewBotHandler(newStubStorer(t))
+	bh := newBotHandler(t)
 	bh.CountHandler(context.Background(), &bot.Bot{}, &models.Update{})
 }
 
@@ -213,7 +219,7 @@ func TestBotHandler_CountHandler_WithStoredCounter(t *testing.T) {
 	st.stored = []Counter{
 		{Count: 5, Capacity: 50, LastUpdate: LastUpdate{Time: time.Now()}},
 	}
-	bh := NewBotHandler(st)
+	bh := NewBotHandler("TST", map[string]Storer{"TST": st})
 	//nolint:errcheck
 	defer func() { recover() }()
 	bh.CountHandler(context.Background(), &bot.Bot{}, &models.Update{
@@ -221,13 +227,61 @@ func TestBotHandler_CountHandler_WithStoredCounter(t *testing.T) {
 	})
 }
 
+func TestBotHandler_CountHandler_WithGymArg(t *testing.T) {
+	stTST := newStubStorer(t)
+	stSLB := newStubStorer(t)
+	stSLB.stored = []Counter{
+		{Count: 12, Capacity: 50, LastUpdate: LastUpdate{Time: time.Now()}},
+	}
+	bh := NewBotHandler("TST", map[string]Storer{"TST": stTST, "SLB": stSLB})
+	//nolint:errcheck
+	defer func() { recover() }()
+	// "/count SLB" — should use stSLB, not stTST
+	bh.CountHandler(context.Background(), &bot.Bot{}, &models.Update{
+		Message: &models.Message{
+			Chat: models.Chat{ID: 1},
+			Text: "/count SLB",
+		},
+	})
+}
+
+func TestBotHandler_CountHandler_WithGymArgLowercase(t *testing.T) {
+	st := newStubStorer(t)
+	st.stored = []Counter{
+		{Count: 7, Capacity: 30, LastUpdate: LastUpdate{Time: time.Now()}},
+	}
+	bh := NewBotHandler("TST", map[string]Storer{"SLB": st})
+	//nolint:errcheck
+	defer func() { recover() }()
+	// lowercase arg should still match
+	bh.CountHandler(context.Background(), &bot.Bot{}, &models.Update{
+		Message: &models.Message{
+			Chat: models.Chat{ID: 1},
+			Text: "/count slb",
+		},
+	})
+}
+
+func TestBotHandler_CountHandler_UnknownGymArg(t *testing.T) {
+	bh := NewBotHandler("TST", map[string]Storer{"TST": newStubStorer(t)})
+	//nolint:errcheck
+	defer func() { recover() }()
+	// Unknown gym should send an error message (panics on nil bot — recover catches it)
+	bh.CountHandler(context.Background(), &bot.Bot{}, &models.Update{
+		Message: &models.Message{
+			Chat: models.Chat{ID: 1},
+			Text: "/count XYZ",
+		},
+	})
+}
+
 func TestBotHandler_GymHandler_NilMessage(t *testing.T) {
-	bh := NewBotHandler(newStubStorer(t))
+	bh := newBotHandler(t)
 	bh.GymHandler(context.Background(), &bot.Bot{}, &models.Update{})
 }
 
 func TestBotHandler_GymHandler_WithMessage(t *testing.T) {
-	bh := NewBotHandler(newStubStorer(t))
+	bh := newBotHandler(t)
 	//nolint:errcheck
 	defer func() { recover() }()
 	bh.GymHandler(context.Background(), &bot.Bot{}, &models.Update{
@@ -236,7 +290,7 @@ func TestBotHandler_GymHandler_WithMessage(t *testing.T) {
 }
 
 func TestBotHandler_GymButtonHandler_NilCallbackQuery(t *testing.T) {
-	bh := NewBotHandler(newStubStorer(t))
+	bh := newBotHandler(t)
 	bh.GymButtonHandler(context.Background(), &bot.Bot{}, &models.Update{})
 }
 

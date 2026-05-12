@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
+	"strings"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -51,24 +53,41 @@ func (jh *JobHandler) Description() string {
 }
 
 type BotHandler struct {
-	storage Storer
-	logger  *slog.Logger
+	storers    map[string]Storer
+	defaultGym string
+	logger     *slog.Logger
 }
 
-func NewBotHandler(storage Storer) *BotHandler {
+func NewBotHandler(defaultGym string, storers map[string]Storer) *BotHandler {
 	logger := slog.Default().With("component", "bot handler")
 	return &BotHandler{
-		storage: storage,
-		logger:  logger,
+		storers:    storers,
+		defaultGym: defaultGym,
+		logger:     logger,
 	}
 }
 
 func (bh *BotHandler) CountHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	bh.logger.Info("CountHandler", "text", update.Message)
 	if update.Message == nil {
 		return
 	}
-	if counter, ok := bh.storage.Last(); ok {
-		b.SendMessage(ctx, bh.Message(b, update.Message.Chat.ID, counter.String()))
+	chatID := update.Message.Chat.ID
+
+	gymKey := bh.defaultGym
+	if fields := strings.Fields(update.Message.Text); len(fields) >= 2 {
+		gymKey = strings.ToUpper(fields[1])
+	}
+
+	storer, ok := bh.storers[gymKey]
+	if !ok {
+		b.SendMessage(ctx, bh.Message(b, chatID,
+			fmt.Sprintf("Unknown gym %q. Known gyms: %s", gymKey, bh.gymKeys())))
+		return
+	}
+
+	if counter, ok := storer.Last(); ok {
+		b.SendMessage(ctx, bh.Message(b, chatID, counter.String()))
 	}
 }
 
@@ -101,9 +120,16 @@ func (bh *BotHandler) GymButtonHandler(ctx context.Context, b *bot.Bot, update *
 
 	chatID := update.CallbackQuery.Message.Message.Chat.ID
 
+	storer, ok := bh.storers[bh.defaultGym]
+	if !ok {
+		b.SendMessage(ctx, bh.Message(b, chatID,
+			fmt.Sprintf("Unknown gym %q. Known gyms: %s", bh.defaultGym, bh.gymKeys())))
+		return
+	}
+
 	if update.CallbackQuery.Data == "gym_in" {
 		msg := "Have a great climb!"
-		err := bh.storage.GetGym().In()
+		err := storer.GetGym().In()
 		if err != nil {
 			msg = err.Error()
 		}
@@ -111,7 +137,7 @@ func (bh *BotHandler) GymButtonHandler(ctx context.Context, b *bot.Bot, update *
 	}
 
 	if update.CallbackQuery.Data == "gym_out" {
-		msg, err := bh.storage.GetGym().Out()
+		msg, err := storer.GetGym().Out()
 		if err != nil {
 			b.SendMessage(ctx, bh.Message(b, chatID, err.Error()))
 			return
@@ -138,4 +164,13 @@ func (bh *BotHandler) Reaction(b *bot.Bot, chatID int64, msgId int, emoji string
 			}},
 		},
 	}
+}
+
+func (bh *BotHandler) gymKeys() string {
+	keys := make([]string, 0, len(bh.storers))
+	for k := range bh.storers {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, ", ")
 }
