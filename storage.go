@@ -2,7 +2,11 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -23,14 +27,20 @@ type Storage struct {
 	gym      *Gym
 }
 
-// NewStorage creates a new Storage instance with the given file path
-func NewStorage(filePath string) (*Storage, error) {
+// NewStorage creates a new Storage instance for the given gym inside storageDir.
+func NewStorage(storageDir, gymName string) (*Storage, error) {
+	if err := os.MkdirAll(storageDir, 0o755); err != nil {
+		return nil, fmt.Errorf("create storage dir %q: %w", storageDir, err)
+	}
+
+	fileName := strings.ToLower(gymName) + ".db"
+	filePath := filepath.Join(storageDir, fileName)
+
 	db, err := sql.Open("sqlite", filePath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create table if it doesn't exist
 	createTableQuery := `
     CREATE TABLE IF NOT EXISTS count (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,8 +48,7 @@ func NewStorage(filePath string) (*Storage, error) {
         capacity INTEGER,
         last_update TEXT
     );`
-	_, err = db.Exec(createTableQuery)
-	if err != nil {
+	if _, err = db.Exec(createTableQuery); err != nil {
 		return nil, err
 	}
 
@@ -47,7 +56,6 @@ func NewStorage(filePath string) (*Storage, error) {
 }
 
 // NewGym initializes and stores the Gym instance using the Storage's file path.
-// It returns an error if the Gym instance cannot be created.
 func (s *Storage) NewGym() error {
 	var err error
 	s.gym, err = NewGym(s.filePath)
@@ -63,7 +71,6 @@ func (s *Storage) GetGym() *Gym {
 func (s *Storage) Store(counter Counter) error {
 	logger := slog.Default().With("component", "storage")
 
-	// Check for deduplication
 	var lastUpdate string
 	query := "SELECT last_update FROM count ORDER BY id DESC LIMIT 1"
 	err := s.db.QueryRow(query).Scan(&lastUpdate)
@@ -77,13 +84,11 @@ func (s *Storage) Store(counter Counter) error {
 			return err
 		}
 		if counter.LastUpdate.Equal(lastTime) {
-			// Last update is the same, do nothing
 			logger.Info("skipping duplicated counter", "counter", counter)
 			return nil
 		}
 	}
 
-	// Insert new record
 	insertQuery := `
     INSERT INTO count (count, capacity, last_update)
     VALUES (?, ?, ?)`
@@ -99,10 +104,11 @@ func (s *Storage) Store(counter Counter) error {
 // Last returns the last stored Counter and a boolean indicating if it was successful
 func (s *Storage) Last() (Counter, bool) {
 	logger := slog.Default().With("component", "storage", "function", "last")
-	var counter Counter
 
+	var counter Counter
 	query := "SELECT count, capacity, last_update FROM count ORDER BY id DESC LIMIT 1"
 	row := s.db.QueryRow(query)
+
 	var lastUpdate string
 	if err := row.Scan(&counter.Count, &counter.Capacity, &lastUpdate); err != nil {
 		if err == sql.ErrNoRows {

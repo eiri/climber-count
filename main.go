@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/go-telegram/bot"
@@ -23,24 +24,52 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Fetch counters once to discover all available gym keys.
 	client := NewClient(cfg)
-	storage, err := NewStorage(cfg.Storage)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = storage.NewGym()
+	counters, err := client.Counters()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	jh := NewJobHandler(cfg.Gym, client, storage)
-	bh := NewBotHandler(storage)
+	// Build one Storage (and Gym) per gym found in the scraped counters.
+	storers := make(map[string]Storer)
+	for gymKey := range *counters {
+		st, err := NewStorage(cfg.Storage, gymKey)
+		if err != nil {
+			log.Fatalf("create storage for gym %q: %v", gymKey, err)
+		}
+		if err := st.NewGym(); err != nil {
+			log.Fatalf("init gym for %q: %v", gymKey, err)
+		}
+		storers[gymKey] = st
+	}
+
+	if len(storers) == 0 {
+		log.Fatal("no gyms found in scraped data")
+	}
+
+	// The configured GYM drives the Telegram bot responses.
+	botStorage, ok := storers[cfg.Gym]
+	if !ok {
+		// Fallback: use the first storer (shouldn't happen in normal operation).
+		slog.Warn("configured GYM not found in scraped data, falling back",
+			"gym", cfg.Gym,
+			"available", gymKeys(storers),
+		)
+		for _, s := range storers {
+			botStorage = s
+			break
+		}
+	}
+
+	jh := NewJobHandler(cfg.Storage, client, storers)
+	bh := NewBotHandler(botStorage)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	// pull and store the latest count
-	err = jh.Execute(ctx)
-	if err != nil {
+
+	// Store the freshly-fetched counters for all gyms immediately.
+	if err := jh.Execute(ctx); err != nil {
 		log.Fatal(err)
 	}
 
@@ -49,8 +78,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	sched.Start(ctx)
+
 	for key, crontab := range cfg.Schedule {
 		slog.Info("schedule job", "job_key", key, "crontab", crontab, "loc", loc)
 		cronTrigger, _ := quartz.NewCronTriggerWithLoc(crontab, loc)
@@ -59,14 +88,13 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	// shutdown sched on exit
+
 	defer func() {
 		sched.Stop()
 		sched.Wait(ctx)
 	}()
 
 	opts := []bot.Option{
-		// just no-op
 		bot.WithDefaultHandler(func(ctx context.Context, b *bot.Bot, update *models.Update) {}),
 		bot.WithDebugHandler(func(format string, args ...any) {
 			slog.Debug(fmt.Sprintf(format, args), "component", "telegram bot")
@@ -86,4 +114,12 @@ func main() {
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, "gym", bot.MatchTypePrefix, bh.GymButtonHandler)
 
 	b.Start(ctx)
+}
+
+func gymKeys(m map[string]Storer) string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return strings.Join(keys, ", ")
 }
