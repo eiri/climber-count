@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/reugn/go-quartz/logger"
 	"github.com/reugn/go-quartz/quartz"
 )
@@ -47,11 +48,15 @@ func main() {
 		log.Fatal("no gyms found in scraped data")
 	}
 
-	jh := NewJobHandler(cfg.Storage, client, storers)
-	bh := NewBotHandler(cfg.Gym, storers)
+	reg := prometheus.NewRegistry()
+	metrics := NewMetrics(reg)
+	jh := NewJobHandler(cfg.Storage, client, storers, metrics)
+	bh := NewBotHandler(cfg.Gym, storers, metrics)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
+
+	startMetrics(ctx, cfg.MetricsAddr, reg)
 
 	// Store the freshly-fetched counters for all gyms immediately.
 	if err := jh.Execute(ctx); err != nil {

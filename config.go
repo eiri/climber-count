@@ -7,12 +7,13 @@ import (
 )
 
 type Config struct {
-	PGK      string
-	FID      string
-	Gym      string
-	BotToken string
-	Storage  string
-	Schedule map[string]string
+	PGK         string
+	FID         string
+	Gym         string
+	BotToken    string
+	Storage     string
+	MetricsAddr string
+	Schedule    map[string]string
 }
 
 func NewConfig() (*Config, error) {
@@ -33,6 +34,11 @@ func NewConfig() (*Config, error) {
 			return &cfg, fmt.Errorf("the required env var %q is not set", key)
 		}
 		*ptr = val
+	}
+
+	cfg.MetricsAddr = ":9090"
+	if val, ok := os.LookupEnv("METRICS_ADDR"); ok {
+		cfg.MetricsAddr = val
 	}
 
 	if val, ok := os.LookupEnv("SCHEDULE"); ok {

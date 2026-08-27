@@ -55,6 +55,30 @@ func TestNewConfig_AllVarsSet(t *testing.T) {
 	if cfg.Storage != envVars["STORAGE"] {
 		t.Errorf("expected STORAGE %q, got %q", envVars["STORAGE"], cfg.Storage)
 	}
+	if cfg.MetricsAddr != ":9090" {
+		t.Errorf("expected METRICS_ADDR default %q, got %q", ":9090", cfg.MetricsAddr)
+	}
+}
+
+func TestNewConfig_MetricsAddr(t *testing.T) {
+	envVars := map[string]string{
+		"PGK":          "pgk_value",
+		"FID":          "fid_value",
+		"GYM":          "gym_value",
+		"BOT_TOKEN":    "bot_token_value",
+		"METRICS_ADDR": ":8080",
+	}
+	setEnvVars(t, envVars)
+	defer unsetEnvVars(t, envVars)
+
+	cfg, err := NewConfig()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.MetricsAddr != envVars["METRICS_ADDR"] {
+		t.Errorf("expected METRICS_ADDR %q, got %q", envVars["METRICS_ADDR"], cfg.MetricsAddr)
+	}
 }
 
 func TestNewConfig_RequiredVarsNotSet(t *testing.T) {
