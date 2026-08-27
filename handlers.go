@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -15,35 +16,47 @@ type JobHandler struct {
 	storageDir string
 	client     *Client
 	storers    map[string]Storer
+	metrics    *Metrics
 }
 
-func NewJobHandler(storageDir string, client *Client, storers map[string]Storer) *JobHandler {
-	return &JobHandler{
+func NewJobHandler(storageDir string, client *Client, storers map[string]Storer, metrics ...*Metrics) *JobHandler {
+	jh := &JobHandler{
 		storageDir: storageDir,
 		client:     client,
 		storers:    storers,
 	}
+	if len(metrics) > 0 {
+		jh.metrics = metrics[0]
+	}
+	return jh
 }
 
 func (jh *JobHandler) Execute(ctx context.Context) error {
 	logger := slog.Default().With("component", "cron handler")
 
+	started := time.Now()
 	counters, err := jh.client.Counters()
 	if err != nil {
 		logger.Error("can't get counters from client", "msg", err)
+		jh.metrics.ScrapeErr(time.Since(started))
 		return err
 	}
+	jh.metrics.ScrapeOK(time.Since(started))
 
 	var firstErr error
 	for gym, storer := range jh.storers {
 		counter := counters.Counter(gym)
 		logger.Info("got counter from client", "gym", gym, "counter", counter)
+		jh.metrics.Counter(gym, counter)
 		if err := storer.Store(counter); err != nil {
 			logger.Error("failed to store counter", "gym", gym, "msg", err)
+			jh.metrics.Store(gym, false)
 			if firstErr == nil {
 				firstErr = err
 			}
+			continue
 		}
+		jh.metrics.Store(gym, true)
 	}
 	return firstErr
 }
@@ -56,15 +69,20 @@ type BotHandler struct {
 	storers    map[string]Storer
 	defaultGym string
 	logger     *slog.Logger
+	metrics    *Metrics
 }
 
-func NewBotHandler(defaultGym string, storers map[string]Storer) *BotHandler {
+func NewBotHandler(defaultGym string, storers map[string]Storer, metrics ...*Metrics) *BotHandler {
 	logger := slog.Default().With("component", "bot handler")
-	return &BotHandler{
+	bh := &BotHandler{
 		storers:    storers,
 		defaultGym: defaultGym,
 		logger:     logger,
 	}
+	if len(metrics) > 0 {
+		bh.metrics = metrics[0]
+	}
+	return bh
 }
 
 func (bh *BotHandler) CountHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -81,12 +99,15 @@ func (bh *BotHandler) CountHandler(ctx context.Context, b *bot.Bot, update *mode
 
 	storer, ok := bh.storers[gymKey]
 	if !ok {
+		bh.metrics.BotCommand("count", false)
 		b.SendMessage(ctx, bh.Message(b, chatID,
 			fmt.Sprintf("Unknown gym %q. Known gyms: %s", gymKey, bh.gymKeys())))
 		return
 	}
 
-	if counter, ok := storer.Last(); ok {
+	counter, ok := storer.Last()
+	bh.metrics.BotCommand("count", ok)
+	if ok {
 		b.SendMessage(ctx, bh.Message(b, chatID, counter.String()))
 	}
 }
@@ -96,6 +117,7 @@ func (bh *BotHandler) GymHandler(ctx context.Context, b *bot.Bot, update *models
 		return
 	}
 	chatID := update.Message.Chat.ID
+	bh.metrics.BotCommand("gym", true)
 	msg := bh.Message(b, chatID, "Going into the gym?")
 	msg.ReplyMarkup = &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
@@ -122,28 +144,49 @@ func (bh *BotHandler) GymButtonHandler(ctx context.Context, b *bot.Bot, update *
 
 	storer, ok := bh.storers[bh.defaultGym]
 	if !ok {
+		bh.metrics.BotCommand(update.CallbackQuery.Data, false)
 		b.SendMessage(ctx, bh.Message(b, chatID,
 			fmt.Sprintf("Unknown gym %q. Known gyms: %s", bh.defaultGym, bh.gymKeys())))
 		return
 	}
 
 	if update.CallbackQuery.Data == "gym_in" {
-		msg := "Have a great climb!"
-		err := storer.GetGym().In()
-		if err != nil {
-			msg = err.Error()
-		}
+		msg := bh.gymIn(storer)
 		b.SendMessage(ctx, bh.Message(b, chatID, msg))
 	}
 
 	if update.CallbackQuery.Data == "gym_out" {
-		msg, err := storer.GetGym().Out()
+		msg, err := bh.gymOut(storer)
 		if err != nil {
 			b.SendMessage(ctx, bh.Message(b, chatID, err.Error()))
 			return
 		}
 		b.SendMessage(ctx, bh.Message(b, chatID, fmt.Sprintf("You went to gym %s. Good job!", msg)))
 	}
+}
+
+func (bh *BotHandler) gymIn(storer Storer) string {
+	msg := "Have a great climb!"
+	if err := storer.GetGym().In(); err != nil {
+		bh.metrics.BotCommand("gym_in", false)
+		return err.Error()
+	}
+
+	bh.metrics.BotCommand("gym_in", true)
+	bh.metrics.Visit(bh.defaultGym, "in")
+	return msg
+}
+
+func (bh *BotHandler) gymOut(storer Storer) (string, error) {
+	msg, err := storer.GetGym().Out()
+	if err != nil {
+		bh.metrics.BotCommand("gym_out", false)
+		return "", err
+	}
+
+	bh.metrics.BotCommand("gym_out", true)
+	bh.metrics.Visit(bh.defaultGym, "out")
+	return msg, nil
 }
 
 func (bh *BotHandler) Message(b *bot.Bot, chatID int64, msg string) *bot.SendMessageParams {

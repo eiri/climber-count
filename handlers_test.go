@@ -13,6 +13,8 @@ import (
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 type stubStorer struct {
@@ -133,6 +135,35 @@ func TestJobHandler_Execute_MultipleGyms(t *testing.T) {
 	}
 }
 
+func TestJobHandler_Execute_Metrics(t *testing.T) {
+	page := minimalOccupancyHTML("TST", 3, 30)
+	cfg := &Config{PGK: "pgk", FID: "fid"}
+	c := NewClient(cfg)
+	c.client = &MockClient{
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(page)),
+		},
+	}
+	m := NewMetrics(prometheus.NewRegistry())
+	storers := map[string]Storer{"TST": newStubStorer(t)}
+	jh := NewJobHandler(t.TempDir(), c, storers, m)
+
+	if err := jh.Execute(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := testutil.ToFloat64(m.scrapes.WithLabelValues("ok")); got != 1 {
+		t.Errorf("expected scrape ok 1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.stores.WithLabelValues("TST", "ok")); got != 1 {
+		t.Errorf("expected store ok 1, got %v", got)
+	}
+	if got := testutil.ToFloat64(m.people.WithLabelValues("TST")); got != 3 {
+		t.Errorf("expected people 3, got %v", got)
+	}
+}
+
 func TestJobHandler_Execute_FetchError(t *testing.T) {
 	cfg := &Config{PGK: "pgk", FID: "fid"}
 	c := NewClient(cfg)
@@ -141,6 +172,22 @@ func TestJobHandler_Execute_FetchError(t *testing.T) {
 	jh := NewJobHandler(t.TempDir(), c, storers)
 	if err := jh.Execute(context.Background()); err == nil {
 		t.Fatal("expected error when fetch fails")
+	}
+}
+
+func TestJobHandler_Execute_FetchErrorMetric(t *testing.T) {
+	cfg := &Config{PGK: "pgk", FID: "fid"}
+	c := NewClient(cfg)
+	c.client = &MockClient{err: errors.New("network down")}
+	m := NewMetrics(prometheus.NewRegistry())
+	storers := map[string]Storer{"TST": newStubStorer(t)}
+	jh := NewJobHandler(t.TempDir(), c, storers, m)
+
+	if err := jh.Execute(context.Background()); err == nil {
+		t.Fatal("expected error when fetch fails")
+	}
+	if got := testutil.ToFloat64(m.scrapes.WithLabelValues("error")); got != 1 {
+		t.Errorf("expected scrape error 1, got %v", got)
 	}
 }
 
@@ -292,6 +339,46 @@ func TestBotHandler_GymHandler_WithMessage(t *testing.T) {
 func TestBotHandler_GymButtonHandler_NilCallbackQuery(t *testing.T) {
 	bh := newBotHandler(t)
 	bh.GymButtonHandler(context.Background(), &bot.Bot{}, &models.Update{})
+}
+
+func TestBotHandler_GymVisitMetrics(t *testing.T) {
+	st := newStubStorer(t)
+	if err := st.NewGym(); err != nil {
+		t.Fatalf("NewGym: %v", err)
+	}
+	m := NewMetrics(prometheus.NewRegistry())
+	bh := NewBotHandler("TST", map[string]Storer{"TST": st}, m)
+
+	msg := bh.gymIn(st)
+	if msg != "Have a great climb!" {
+		t.Errorf("expected check-in message, got %q", msg)
+	}
+	if got := testutil.ToFloat64(m.visits.WithLabelValues("TST", "in")); got != 1 {
+		t.Errorf("expected in visits 1, got %v", got)
+	}
+
+	if _, err := bh.gymOut(st); err != nil {
+		t.Fatalf("gymOut: %v", err)
+	}
+	if got := testutil.ToFloat64(m.visits.WithLabelValues("TST", "out")); got != 1 {
+		t.Errorf("expected out visits 1, got %v", got)
+	}
+}
+
+func TestBotHandler_GymVisitMetricSkipsErrors(t *testing.T) {
+	st := newStubStorer(t)
+	if err := st.NewGym(); err != nil {
+		t.Fatalf("NewGym: %v", err)
+	}
+	m := NewMetrics(prometheus.NewRegistry())
+	bh := NewBotHandler("TST", map[string]Storer{"TST": st}, m)
+
+	if _, err := bh.gymOut(st); err == nil {
+		t.Fatal("expected gymOut error")
+	}
+	if got := testutil.ToFloat64(m.visits.WithLabelValues("TST", "out")); got != 0 {
+		t.Errorf("expected out visits 0, got %v", got)
+	}
 }
 
 // multiGymOccupancyHTML builds a minimal rockgympro HTML page containing
