@@ -24,7 +24,7 @@ GYM - A gym abbreviation. The response can contain multiple gyms' counters.
 SCHEDULE - Key=crontab pairs separated by |. For example: weekdays=4 */5 8-22 * * MON-FRI|weekends=2 */5 8-20 * * SAT,SUN. This pulls the counter every five minutes during the gym's working hours. Theoretically, it can go down to seconds, but there is no need to spam rockgympro.com. Be nice.
 STORAGE - A path to the SQLite file.
 BOT_TOKEN - A Telegram bot token from @BotFather.
-METRICS_ADDR - Optional Prometheus metrics listen address. Defaults to :9090. Metrics are exposed at /metrics.
+METRICS_ADDR - Optional Prometheus metrics listen address. Defaults to :9117. Metrics are exposed at /metrics.
 ```
 
 For Docker, it is probably more convenient to use [docker-compose](compose.yaml).

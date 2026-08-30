@@ -3,7 +3,7 @@ services:
     image: ghcr.io/eiri/climber-count
     env_file: ".env"
     ports:
-      - "9090:9090"
+      - "9117:9117"
     volumes:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
