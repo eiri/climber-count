@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/imbue11235/humanize"
 	_ "modernc.org/sqlite"
 )
 
@@ -54,21 +53,21 @@ func (g *Gym) In() error {
 	return g.writeAction("in")
 }
 
-// Out writes an "out" action with the current timestamp to the database and returns the time delta since the latest "in" action.
-func (g *Gym) Out() (string, error) {
+// Out writes an "out" action and returns the visit start time.
+func (g *Gym) Out() (time.Time, error) {
 	last, lastTs, err := g.lastAction()
 	if err != nil {
-		return "", err
+		return time.Time{}, err
 	}
 	if last != "in" {
-		return "", errors.New("cannot check out: no active check-in")
+		return time.Time{}, errors.New("cannot check out: no active check-in")
 	}
 
 	if err = g.writeAction("out"); err != nil {
-		return "", err
+		return time.Time{}, err
 	}
 
-	return humanize.ExactTime(lastTs).FromNow(), nil
+	return lastTs, nil
 }
 
 func (g *Gym) lastAction() (string, time.Time, error) {

@@ -4,36 +4,28 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 )
 
 type Metrics struct {
-	scrapes        *prometheus.CounterVec
 	scrapeDuration prometheus.Histogram
-	stores         *prometheus.CounterVec
-	commands       *prometheus.CounterVec
+	writes         *prometheus.HistogramVec
 	people         *prometheus.GaugeVec
 	lastUpdate     *prometheus.GaugeVec
-	visits         *prometheus.CounterVec
+	entry          *prometheus.GaugeVec
+	visitDuration  *prometheus.HistogramVec
 }
 
 func NewMetrics(reg *prometheus.Registry) *Metrics {
 	m := &Metrics{
-		scrapes: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "climber_count_scrape_total",
-			Help: "Counter scrape attempts.",
-		}, []string{"status"}),
 		scrapeDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
 			Name: "climber_count_scrape_duration_seconds",
 			Help: "Counter scrape duration.",
 		}),
-		stores: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "climber_count_store_total",
-			Help: "Counter store attempts.",
-		}, []string{"gym", "status"}),
-		commands: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "climber_count_bot_commands_total",
-			Help: "Bot command attempts.",
-		}, []string{"command", "status"}),
+		writes: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name: "sqlite_write_duration_seconds",
+			Help: "SQLite write duration.",
+		}, []string{"operation"}),
 		people: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Name: "climber_count_people",
 			Help: "Collected people count.",
@@ -42,30 +34,43 @@ func NewMetrics(reg *prometheus.Registry) *Metrics {
 			Name: "climber_count_last_update_timestamp_seconds",
 			Help: "Collected counter last update time.",
 		}, []string{"gym"}),
-		visits: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Name: "climber_count_gym_visits_total",
-			Help: "Gym visit events.",
-		}, []string{"gym", "action"}),
+		entry: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "climber_gym_entry_timestamp_seconds",
+			Help: "Current gym visit start time.",
+		}, []string{"gym"}),
+		visitDuration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Name: "climber_gym_visit_duration_seconds",
+			Help: "Completed gym visit duration.",
+		}, []string{"gym"}),
 	}
 
-	reg.MustRegister(m.scrapes, m.scrapeDuration, m.stores, m.commands, m.people, m.lastUpdate, m.visits)
+	reg.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+		m.scrapeDuration,
+		m.writes,
+		m.people,
+		m.lastUpdate,
+		m.entry,
+		m.visitDuration,
+	)
 	return m
 }
 
 func (m *Metrics) ScrapeOK(d time.Duration) {
-	m.scrape("ok", d)
+	m.scrape(d)
 }
 
 func (m *Metrics) ScrapeErr(d time.Duration) {
-	m.scrape("error", d)
+	m.scrape(d)
 }
 
-func (m *Metrics) Store(gym string, ok bool) {
-	if m == nil || m.stores == nil {
+func (m *Metrics) Write(operation string, d time.Duration) {
+	if m == nil || m.writes == nil {
 		return
 	}
 
-	m.stores.WithLabelValues(gym, status(ok)).Inc()
+	m.writes.WithLabelValues(operation).Observe(d.Seconds())
 }
 
 func (m *Metrics) Counter(gym string, counter Counter) {
@@ -77,34 +82,27 @@ func (m *Metrics) Counter(gym string, counter Counter) {
 	m.lastUpdate.WithLabelValues(gym).Set(float64(counter.LastUpdate.Unix()))
 }
 
-func (m *Metrics) BotCommand(command string, ok bool) {
-	if m == nil || m.commands == nil {
+func (m *Metrics) VisitIn(gym string, ts time.Time) {
+	if m == nil || m.entry == nil {
 		return
 	}
 
-	m.commands.WithLabelValues(command, status(ok)).Inc()
+	m.entry.WithLabelValues(gym).Set(float64(ts.Unix()))
 }
 
-func (m *Metrics) Visit(gym, action string) {
-	if m == nil || m.visits == nil {
+func (m *Metrics) VisitOut(gym string, d time.Duration) {
+	if m == nil || m.entry == nil || m.visitDuration == nil {
 		return
 	}
 
-	m.visits.WithLabelValues(gym, action).Inc()
+	m.entry.WithLabelValues(gym).Set(0)
+	m.visitDuration.WithLabelValues(gym).Observe(d.Seconds())
 }
 
-func (m *Metrics) scrape(status string, d time.Duration) {
-	if m == nil || m.scrapes == nil || m.scrapeDuration == nil {
+func (m *Metrics) scrape(d time.Duration) {
+	if m == nil || m.scrapeDuration == nil {
 		return
 	}
 
-	m.scrapes.WithLabelValues(status).Inc()
 	m.scrapeDuration.Observe(d.Seconds())
-}
-
-func status(ok bool) string {
-	if ok {
-		return "ok"
-	}
-	return "error"
 }
