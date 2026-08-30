@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"github.com/imbue11235/humanize"
 )
 
 type JobHandler struct {
@@ -48,15 +49,16 @@ func (jh *JobHandler) Execute(ctx context.Context) error {
 		counter := counters.Counter(gym)
 		logger.Info("got counter from client", "gym", gym, "counter", counter)
 		jh.metrics.Counter(gym, counter)
+		started := time.Now()
 		if err := storer.Store(counter); err != nil {
+			jh.metrics.Write("counter_store", time.Since(started))
 			logger.Error("failed to store counter", "gym", gym, "msg", err)
-			jh.metrics.Store(gym, false)
 			if firstErr == nil {
 				firstErr = err
 			}
 			continue
 		}
-		jh.metrics.Store(gym, true)
+		jh.metrics.Write("counter_store", time.Since(started))
 	}
 	return firstErr
 }
@@ -99,14 +101,12 @@ func (bh *BotHandler) CountHandler(ctx context.Context, b *bot.Bot, update *mode
 
 	storer, ok := bh.storers[gymKey]
 	if !ok {
-		bh.metrics.BotCommand("count", false)
 		b.SendMessage(ctx, bh.Message(b, chatID,
 			fmt.Sprintf("Unknown gym %q. Known gyms: %s", gymKey, bh.gymKeys())))
 		return
 	}
 
 	counter, ok := storer.Last()
-	bh.metrics.BotCommand("count", ok)
 	if ok {
 		b.SendMessage(ctx, bh.Message(b, chatID, counter.String()))
 	}
@@ -117,7 +117,6 @@ func (bh *BotHandler) GymHandler(ctx context.Context, b *bot.Bot, update *models
 		return
 	}
 	chatID := update.Message.Chat.ID
-	bh.metrics.BotCommand("gym", true)
 	msg := bh.Message(b, chatID, "Going into the gym?")
 	msg.ReplyMarkup = &models.InlineKeyboardMarkup{
 		InlineKeyboard: [][]models.InlineKeyboardButton{
@@ -144,7 +143,6 @@ func (bh *BotHandler) GymButtonHandler(ctx context.Context, b *bot.Bot, update *
 
 	storer, ok := bh.storers[bh.defaultGym]
 	if !ok {
-		bh.metrics.BotCommand(update.CallbackQuery.Data, false)
 		b.SendMessage(ctx, bh.Message(b, chatID,
 			fmt.Sprintf("Unknown gym %q. Known gyms: %s", bh.defaultGym, bh.gymKeys())))
 		return
@@ -167,26 +165,28 @@ func (bh *BotHandler) GymButtonHandler(ctx context.Context, b *bot.Bot, update *
 
 func (bh *BotHandler) gymIn(storer Storer) string {
 	msg := "Have a great climb!"
+	started := time.Now()
 	if err := storer.GetGym().In(); err != nil {
-		bh.metrics.BotCommand("gym_in", false)
+		bh.metrics.Write("gym_in", time.Since(started))
 		return err.Error()
 	}
 
-	bh.metrics.BotCommand("gym_in", true)
-	bh.metrics.Visit(bh.defaultGym, "in")
+	bh.metrics.Write("gym_in", time.Since(started))
+	bh.metrics.VisitIn(bh.defaultGym, started)
 	return msg
 }
 
 func (bh *BotHandler) gymOut(storer Storer) (string, error) {
-	msg, err := storer.GetGym().Out()
+	started := time.Now()
+	entry, err := storer.GetGym().Out()
 	if err != nil {
-		bh.metrics.BotCommand("gym_out", false)
+		bh.metrics.Write("gym_out", time.Since(started))
 		return "", err
 	}
 
-	bh.metrics.BotCommand("gym_out", true)
-	bh.metrics.Visit(bh.defaultGym, "out")
-	return msg, nil
+	bh.metrics.Write("gym_out", time.Since(started))
+	bh.metrics.VisitOut(bh.defaultGym, time.Since(entry))
+	return humanize.ExactTime(entry).FromNow(), nil
 }
 
 func (bh *BotHandler) Message(b *bot.Bot, chatID int64, msg string) *bot.SendMessageParams {

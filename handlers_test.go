@@ -153,11 +153,11 @@ func TestJobHandler_Execute_Metrics(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if got := testutil.ToFloat64(m.scrapes.WithLabelValues("ok")); got != 1 {
-		t.Errorf("expected scrape ok 1, got %v", got)
+	if got := histCount(t, m.scrapeDuration); got != 1 {
+		t.Errorf("expected scrape count 1, got %d", got)
 	}
-	if got := testutil.ToFloat64(m.stores.WithLabelValues("TST", "ok")); got != 1 {
-		t.Errorf("expected store ok 1, got %v", got)
+	if got := histCount(t, m.writes.WithLabelValues("counter_store").(prometheus.Metric)); got != 1 {
+		t.Errorf("expected store count 1, got %d", got)
 	}
 	if got := testutil.ToFloat64(m.people.WithLabelValues("TST")); got != 3 {
 		t.Errorf("expected people 3, got %v", got)
@@ -186,8 +186,8 @@ func TestJobHandler_Execute_FetchErrorMetric(t *testing.T) {
 	if err := jh.Execute(context.Background()); err == nil {
 		t.Fatal("expected error when fetch fails")
 	}
-	if got := testutil.ToFloat64(m.scrapes.WithLabelValues("error")); got != 1 {
-		t.Errorf("expected scrape error 1, got %v", got)
+	if got := histCount(t, m.scrapeDuration); got != 1 {
+		t.Errorf("expected scrape count 1, got %d", got)
 	}
 }
 
@@ -353,15 +353,18 @@ func TestBotHandler_GymVisitMetrics(t *testing.T) {
 	if msg != "Have a great climb!" {
 		t.Errorf("expected check-in message, got %q", msg)
 	}
-	if got := testutil.ToFloat64(m.visits.WithLabelValues("TST", "in")); got != 1 {
-		t.Errorf("expected in visits 1, got %v", got)
+	if got := testutil.ToFloat64(m.entry.WithLabelValues("TST")); got <= 0 {
+		t.Errorf("expected entry timestamp, got %v", got)
 	}
 
 	if _, err := bh.gymOut(st); err != nil {
 		t.Fatalf("gymOut: %v", err)
 	}
-	if got := testutil.ToFloat64(m.visits.WithLabelValues("TST", "out")); got != 1 {
-		t.Errorf("expected out visits 1, got %v", got)
+	if got := testutil.ToFloat64(m.entry.WithLabelValues("TST")); got != 0 {
+		t.Errorf("expected entry reset, got %v", got)
+	}
+	if got := histCount(t, m.visitDuration.WithLabelValues("TST").(prometheus.Metric)); got != 1 {
+		t.Errorf("expected visit duration count 1, got %d", got)
 	}
 }
 
@@ -376,8 +379,8 @@ func TestBotHandler_GymVisitMetricSkipsErrors(t *testing.T) {
 	if _, err := bh.gymOut(st); err == nil {
 		t.Fatal("expected gymOut error")
 	}
-	if got := testutil.ToFloat64(m.visits.WithLabelValues("TST", "out")); got != 0 {
-		t.Errorf("expected out visits 0, got %v", got)
+	if got := histCount(t, m.visitDuration.WithLabelValues("TST").(prometheus.Metric)); got != 0 {
+		t.Errorf("expected visit duration count 0, got %d", got)
 	}
 }
 

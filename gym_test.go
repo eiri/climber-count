@@ -188,7 +188,7 @@ func TestGymOut_BlocksDoubleOut(t *testing.T) {
 	}
 }
 
-func TestOut_TimeDelta(t *testing.T) {
+func TestOut_EntryTime(t *testing.T) {
 	dbPath := "test_gym_time_delta.sqlite"
 	os.Remove(dbPath)
 	defer os.Remove(dbPath)
@@ -205,12 +205,12 @@ func TestOut_TimeDelta(t *testing.T) {
 		t.Fatalf("unexpected error seeding 'in' row: %v", err)
 	}
 
-	timeDelta, err := g.Out()
+	entry, err := g.Out()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if timeDelta != "2 seconds ago" {
-		t.Errorf("expected '2 seconds ago' but got %s", timeDelta)
+	if entry.Format(time.RFC3339) != inTime {
+		t.Errorf("expected %q but got %q", inTime, entry.Format(time.RFC3339))
 	}
 }
