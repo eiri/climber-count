@@ -71,21 +71,58 @@ func (g *Gym) Out() (time.Time, error) {
 }
 
 func (g *Gym) lastAction() (string, time.Time, error) {
+	_, action, ts, err := g.lastRow()
+	return action, ts, err
+}
+
+func (g *Gym) lastVisit() (time.Time, time.Time, error) {
+	id, action, ts, err := g.lastRow()
+	if err != nil || action == "" {
+		return time.Time{}, time.Time{}, err
+	}
+
+	if action == "in" {
+		return ts, time.Time{}, nil
+	}
+
+	entry, err := g.prevIn(id)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+
+	return entry, ts, nil
+}
+
+func (g *Gym) lastRow() (int64, string, time.Time, error) {
+	var id int64
 	var action, timestampStr string
-	err := g.db.QueryRow("SELECT action, timestamp FROM gym ORDER BY timestamp DESC, id DESC LIMIT 1").Scan(&action, &timestampStr)
+	err := g.db.QueryRow("SELECT id, action, timestamp FROM gym ORDER BY timestamp DESC, id DESC LIMIT 1").Scan(&id, &action, &timestampStr)
 	if err == sql.ErrNoRows {
-		return "", time.Time{}, nil
+		return 0, "", time.Time{}, nil
 	}
 	if err != nil {
-		return "", time.Time{}, err
+		return 0, "", time.Time{}, err
 	}
 
 	ts, err := time.Parse(time.RFC3339, timestampStr)
 	if err != nil {
-		return "", time.Time{}, err
+		return 0, "", time.Time{}, err
 	}
 
-	return action, ts, nil
+	return id, action, ts, nil
+}
+
+func (g *Gym) prevIn(id int64) (time.Time, error) {
+	var timestampStr string
+	err := g.db.QueryRow("SELECT timestamp FROM gym WHERE action = 'in' AND id < ? ORDER BY id DESC LIMIT 1", id).Scan(&timestampStr)
+	if err == sql.ErrNoRows {
+		return time.Time{}, nil
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return time.Parse(time.RFC3339, timestampStr)
 }
 
 func (g *Gym) writeAction(action string) error {
