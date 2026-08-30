@@ -55,8 +55,8 @@ func TestNewConfig_AllVarsSet(t *testing.T) {
 	if cfg.Storage != envVars["STORAGE"] {
 		t.Errorf("expected STORAGE %q, got %q", envVars["STORAGE"], cfg.Storage)
 	}
-	if cfg.MetricsAddr != ":9090" {
-		t.Errorf("expected METRICS_ADDR default %q, got %q", ":9090", cfg.MetricsAddr)
+	if cfg.MetricsAddr != ":9117" {
+		t.Errorf("expected METRICS_ADDR default %q, got %q", ":9117", cfg.MetricsAddr)
 	}
 }
 

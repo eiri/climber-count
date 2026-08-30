@@ -36,7 +36,7 @@ func NewConfig() (*Config, error) {
 		*ptr = val
 	}
 
-	cfg.MetricsAddr = ":9090"
+	cfg.MetricsAddr = ":9117"
 	if val, ok := os.LookupEnv("METRICS_ADDR"); ok {
 		cfg.MetricsAddr = val
 	}
