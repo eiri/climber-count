@@ -3,9 +3,10 @@ module github.com/eiri/climber-count
 go 1.25.0
 
 require (
-	github.com/go-telegram/bot v1.23.0
+	github.com/go-telegram/bot v1.24.0
 	github.com/imbue11235/humanize v1.0.2
 	github.com/prometheus/client_golang v1.24.1
+	github.com/prometheus/client_model v0.6.2
 	github.com/reugn/go-quartz v0.15.2
 	golang.org/x/net v0.58.0
 	modernc.org/sqlite v1.57.0
@@ -21,7 +22,6 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.70.1 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
