@@ -16,27 +16,6 @@ import (
 	"github.com/reugn/go-quartz/quartz"
 )
 
-func bootstrapVisits(storers map[string]Storer, metrics *Metrics) error {
-	for gym, storer := range storers {
-		entry, exit, err := storer.GetGym().lastVisit()
-		if err != nil {
-			return fmt.Errorf("bootstrap visits for %q: %w", gym, err)
-		}
-
-		if entry.IsZero() {
-			continue
-		}
-		if exit.IsZero() {
-			metrics.VisitIn(gym, entry)
-			continue
-		}
-
-		metrics.VisitOut(gym, exit.Sub(entry))
-	}
-
-	return nil
-}
-
 func main() {
 	SetLogger()
 
@@ -71,9 +50,6 @@ func main() {
 
 	reg := prometheus.NewRegistry()
 	metrics := NewMetrics(reg)
-	if err := bootstrapVisits(storers, metrics); err != nil {
-		log.Fatal(err)
-	}
 	jh := NewJobHandler(cfg.Storage, client, storers, metrics)
 	bh := NewBotHandler(cfg.Gym, storers, metrics)
 
