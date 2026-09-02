@@ -165,27 +165,19 @@ func (bh *BotHandler) GymButtonHandler(ctx context.Context, b *bot.Bot, update *
 
 func (bh *BotHandler) gymIn(storer Storer) string {
 	msg := "Have a great climb!"
-	started := time.Now()
 	if err := storer.GetGym().In(); err != nil {
-		bh.metrics.Write("gym_in", time.Since(started))
 		return err.Error()
 	}
 
-	bh.metrics.Write("gym_in", time.Since(started))
-	bh.metrics.VisitIn(bh.defaultGym, started)
 	return msg
 }
 
 func (bh *BotHandler) gymOut(storer Storer) (string, error) {
-	started := time.Now()
 	entry, err := storer.GetGym().Out()
 	if err != nil {
-		bh.metrics.Write("gym_out", time.Since(started))
 		return "", err
 	}
 
-	bh.metrics.Write("gym_out", time.Since(started))
-	bh.metrics.VisitOut(bh.defaultGym, time.Since(entry))
 	return humanize.ExactTime(entry).FromNow(), nil
 }
 

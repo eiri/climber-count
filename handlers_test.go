@@ -162,6 +162,9 @@ func TestJobHandler_Execute_Metrics(t *testing.T) {
 	if got := testutil.ToFloat64(m.people.WithLabelValues("TST")); got != 3 {
 		t.Errorf("expected people 3, got %v", got)
 	}
+	if got := testutil.ToFloat64(m.capacity.WithLabelValues("TST")); got != 30 {
+		t.Errorf("expected capacity 30, got %v", got)
+	}
 }
 
 func TestJobHandler_Execute_FetchError(t *testing.T) {
@@ -339,49 +342,6 @@ func TestBotHandler_GymHandler_WithMessage(t *testing.T) {
 func TestBotHandler_GymButtonHandler_NilCallbackQuery(t *testing.T) {
 	bh := newBotHandler(t)
 	bh.GymButtonHandler(context.Background(), &bot.Bot{}, &models.Update{})
-}
-
-func TestBotHandler_GymVisitMetrics(t *testing.T) {
-	st := newStubStorer(t)
-	if err := st.NewGym(); err != nil {
-		t.Fatalf("NewGym: %v", err)
-	}
-	m := NewMetrics(prometheus.NewRegistry())
-	bh := NewBotHandler("TST", map[string]Storer{"TST": st}, m)
-
-	msg := bh.gymIn(st)
-	if msg != "Have a great climb!" {
-		t.Errorf("expected check-in message, got %q", msg)
-	}
-	if got := testutil.ToFloat64(m.entry.WithLabelValues("TST")); got <= 0 {
-		t.Errorf("expected entry timestamp, got %v", got)
-	}
-
-	if _, err := bh.gymOut(st); err != nil {
-		t.Fatalf("gymOut: %v", err)
-	}
-	if got := testutil.ToFloat64(m.entry.WithLabelValues("TST")); got != 0 {
-		t.Errorf("expected entry reset, got %v", got)
-	}
-	if got := histCount(t, m.visitDuration.WithLabelValues("TST").(prometheus.Metric)); got != 1 {
-		t.Errorf("expected visit duration count 1, got %d", got)
-	}
-}
-
-func TestBotHandler_GymVisitMetricSkipsErrors(t *testing.T) {
-	st := newStubStorer(t)
-	if err := st.NewGym(); err != nil {
-		t.Fatalf("NewGym: %v", err)
-	}
-	m := NewMetrics(prometheus.NewRegistry())
-	bh := NewBotHandler("TST", map[string]Storer{"TST": st}, m)
-
-	if _, err := bh.gymOut(st); err == nil {
-		t.Fatal("expected gymOut error")
-	}
-	if got := histCount(t, m.visitDuration.WithLabelValues("TST").(prometheus.Metric)); got != 0 {
-		t.Errorf("expected visit duration count 0, got %d", got)
-	}
 }
 
 // multiGymOccupancyHTML builds a minimal rockgympro HTML page containing

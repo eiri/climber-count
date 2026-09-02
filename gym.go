@@ -75,24 +75,6 @@ func (g *Gym) lastAction() (string, time.Time, error) {
 	return action, ts, err
 }
 
-func (g *Gym) lastVisit() (time.Time, time.Time, error) {
-	id, action, ts, err := g.lastRow()
-	if err != nil || action == "" {
-		return time.Time{}, time.Time{}, err
-	}
-
-	if action == "in" {
-		return ts, time.Time{}, nil
-	}
-
-	entry, err := g.prevIn(id)
-	if err != nil {
-		return time.Time{}, time.Time{}, err
-	}
-
-	return entry, ts, nil
-}
-
 func (g *Gym) lastRow() (int64, string, time.Time, error) {
 	var id int64
 	var action, timestampStr string
@@ -110,19 +92,6 @@ func (g *Gym) lastRow() (int64, string, time.Time, error) {
 	}
 
 	return id, action, ts, nil
-}
-
-func (g *Gym) prevIn(id int64) (time.Time, error) {
-	var timestampStr string
-	err := g.db.QueryRow("SELECT timestamp FROM gym WHERE action = 'in' AND id < ? ORDER BY id DESC LIMIT 1", id).Scan(&timestampStr)
-	if err == sql.ErrNoRows {
-		return time.Time{}, nil
-	}
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	return time.Parse(time.RFC3339, timestampStr)
 }
 
 func (g *Gym) writeAction(action string) error {

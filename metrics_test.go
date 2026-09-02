@@ -13,18 +13,16 @@ func TestMetrics(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	m := NewMetrics(reg)
 	counter := Counter{
-		Count: 7,
+		Count:    7,
+		Capacity: 70,
 		LastUpdate: LastUpdate{
 			Time: time.Date(2024, time.May, 30, 10, 0, 0, 0, time.UTC),
 		},
 	}
-	entry := time.Date(2024, time.May, 30, 11, 0, 0, 0, time.UTC)
 
 	m.ScrapeOK(time.Second)
 	m.Write("counter_store", time.Second)
 	m.Counter("TST", counter)
-	m.VisitIn("TST", entry)
-	m.VisitOut("TST", time.Hour)
 
 	checks := []struct {
 		name string
@@ -32,8 +30,8 @@ func TestMetrics(t *testing.T) {
 		want float64
 	}{
 		{"people", testutil.ToFloat64(m.people.WithLabelValues("TST")), 7},
+		{"capacity", testutil.ToFloat64(m.capacity.WithLabelValues("TST")), 70},
 		{"last update", testutil.ToFloat64(m.lastUpdate.WithLabelValues("TST")), 1717063200},
-		{"entry", testutil.ToFloat64(m.entry.WithLabelValues("TST")), 0},
 	}
 
 	for _, check := range checks {
@@ -44,9 +42,6 @@ func TestMetrics(t *testing.T) {
 
 	if got := histCount(t, m.writes.WithLabelValues("counter_store").(prometheus.Metric)); got != 1 {
 		t.Errorf("expected write count 1, got %d", got)
-	}
-	if got := histCount(t, m.visitDuration.WithLabelValues("TST").(prometheus.Metric)); got != 1 {
-		t.Errorf("expected visit duration count 1, got %d", got)
 	}
 }
 
