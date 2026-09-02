@@ -71,27 +71,21 @@ func (g *Gym) Out() (time.Time, error) {
 }
 
 func (g *Gym) lastAction() (string, time.Time, error) {
-	_, action, ts, err := g.lastRow()
-	return action, ts, err
-}
-
-func (g *Gym) lastRow() (int64, string, time.Time, error) {
-	var id int64
 	var action, timestampStr string
-	err := g.db.QueryRow("SELECT id, action, timestamp FROM gym ORDER BY timestamp DESC, id DESC LIMIT 1").Scan(&id, &action, &timestampStr)
+	err := g.db.QueryRow("SELECT action, timestamp FROM gym ORDER BY timestamp DESC, id DESC LIMIT 1").Scan(&action, &timestampStr)
 	if err == sql.ErrNoRows {
-		return 0, "", time.Time{}, nil
+		return "", time.Time{}, nil
 	}
 	if err != nil {
-		return 0, "", time.Time{}, err
+		return "", time.Time{}, err
 	}
 
 	ts, err := time.Parse(time.RFC3339, timestampStr)
 	if err != nil {
-		return 0, "", time.Time{}, err
+		return "", time.Time{}, err
 	}
 
-	return id, action, ts, nil
+	return action, ts, nil
 }
 
 func (g *Gym) writeAction(action string) error {
