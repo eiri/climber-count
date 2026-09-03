@@ -27,7 +27,7 @@ BOT_TOKEN - A Telegram bot token from @BotFather.
 METRICS_ADDR - Optional Prometheus metrics listen address. Defaults to :9117. Metrics are exposed at /metrics.
 ```
 
-For Docker, it is probably more convenient to use [docker-compose](compose.yaml).
+For Docker, it is probably more convenient to use [docker-compose](docker-compose.yaml).
 
 ## Licence
 
