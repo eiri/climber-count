@@ -2,11 +2,11 @@
 go = "1.25"
 
 [env]
+CGO_ENABLED = "0"
 _.file = { path = ".env", redact = true }
 
 [tasks.build]
 description = "Build the binary"
-env = { CGO_ENABLED = "0" }
 run = "go build -o climber-count ./..."
 
 [tasks.test]
@@ -16,35 +16,6 @@ run = "go test ./..."
 [tasks.lint]
 description = "Run golangci-lint"
 run = "golangci-lint run ./..."
-
-[tasks.climber-count]
-description = "Build and run the app"
-depends = ["build"]
-run = "./climber-count"
-
-[tasks.clean]
-description = "Clean Go artifacts"
-run = "go clean"
-
-[tasks.image]
-description = "Build linux/arm64 Docker image"
-env = { GOOS = "linux", GOARCH = "arm64" }
-run = [
-  "go build -o climber-count ./...",
-  "docker buildx build -t ghcr.io/eiri/climber-count:latest . --platform=linux/arm64",
-]
-
-[tasks.docker-up]
-description = "Start Docker Compose services"
-run = "docker compose up -d"
-
-[tasks.docker-down]
-description = "Stop Docker Compose services"
-run = "docker compose down"
-
-[tasks.docker-logs]
-description = "Show Docker Compose logs"
-run = "docker compose logs"
 
 [tasks.fmt-check]
 description = "Check gofmt"
@@ -69,3 +40,32 @@ run = [
   "mise run test",
   "mise run lint",
 ]
+
+[tasks.clean]
+description = "Clean Go artifacts"
+run = "go clean"
+
+[tasks.climber-count]
+description = "Build and run the app"
+depends = ["build"]
+run = "./climber-count"
+
+[tasks.image]
+description = "Build linux/arm64 Docker image"
+env = { GOOS = "linux", GOARCH = "arm64" }
+run = [
+  "go build -o climber-count ./...",
+  "docker buildx build -t ghcr.io/eiri/climber-count:latest . --platform=linux/arm64",
+]
+
+[tasks.docker-up]
+description = "Start Docker Compose services"
+run = "docker compose up -d"
+
+[tasks.docker-down]
+description = "Stop Docker Compose services"
+run = "docker compose down"
+
+[tasks.docker-logs]
+description = "Show Docker Compose logs"
+run = "docker compose logs"
