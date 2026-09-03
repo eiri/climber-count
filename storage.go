@@ -4,15 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
-
-	_ "modernc.org/sqlite"
 )
 
-// Storer interface with a single Store method
+// Storer persists counters and visit logs.
 type Storer interface {
 	Store(counter Counter) error
 	Last() (Counter, bool)
@@ -20,60 +16,61 @@ type Storer interface {
 	GetGym() *Gym
 }
 
-// Storage struct with the path to the storage file
+// Storage stores counters for one gym in a shared DB.
 type Storage struct {
-	filePath string
-	db       *sql.DB
-	gym      *Gym
+	db  *sql.DB
+	gym string
+	log *Gym
 }
 
-// NewStorage creates a new Storage instance for the given gym inside storageDir.
-func NewStorage(storageDir, gymName string) (*Storage, error) {
-	if err := os.MkdirAll(storageDir, 0o755); err != nil {
-		return nil, fmt.Errorf("create storage dir %q: %w", storageDir, err)
-	}
-
-	fileName := strings.ToLower(gymName) + ".db"
-	filePath := filepath.Join(storageDir, fileName)
-
-	db, err := sql.Open("sqlite", filePath)
-	if err != nil {
+// NewStorage creates a storage wrapper for the given gym.
+func NewStorage(db *sql.DB, gymName string) (*Storage, error) {
+	if err := initStorage(db); err != nil {
 		return nil, err
 	}
 
-	createTableQuery := `
-    CREATE TABLE IF NOT EXISTS count (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        count INTEGER,
-        capacity INTEGER,
-        last_update TEXT
-    );`
-	if _, err = db.Exec(createTableQuery); err != nil {
-		return nil, err
-	}
-
-	return &Storage{db: db, filePath: filePath}, nil
+	return &Storage{db: db, gym: strings.ToUpper(gymName)}, nil
 }
 
-// NewGym initializes and stores the Gym instance using the Storage's file path.
+func initStorage(db *sql.DB) error {
+	queries := []string{
+		`CREATE TABLE IF NOT EXISTS counter (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			gym TEXT NOT NULL,
+			count INTEGER,
+			capacity INTEGER,
+			last_update TEXT
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_counter_gym_id ON counter(gym, id);`,
+	}
+
+	for _, query := range queries {
+		if _, err := db.Exec(query); err != nil {
+			return fmt.Errorf("init counter schema: %w", err)
+		}
+	}
+	return nil
+}
+
+// NewGym initializes and stores the Gym instance using the Storage's DB.
 func (s *Storage) NewGym() error {
 	var err error
-	s.gym, err = NewGym(s.filePath)
+	s.log, err = NewGym(s.db, s.gym)
 	return err
 }
 
 // GetGym returns the Gym instance associated with the Storage object.
 func (s *Storage) GetGym() *Gym {
-	return s.gym
+	return s.log
 }
 
-// Store stores the given counter in the storage table
+// Store stores the given counter in the storage table.
 func (s *Storage) Store(counter Counter) error {
-	logger := slog.Default().With("component", "storage")
+	logger := slog.Default().With("component", "storage", "gym", s.gym)
 
 	var lastUpdate string
-	query := "SELECT last_update FROM count ORDER BY id DESC LIMIT 1"
-	err := s.db.QueryRow(query).Scan(&lastUpdate)
+	query := "SELECT last_update FROM counter WHERE gym = ? ORDER BY id DESC LIMIT 1"
+	err := s.db.QueryRow(query, s.gym).Scan(&lastUpdate)
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
@@ -90,9 +87,9 @@ func (s *Storage) Store(counter Counter) error {
 	}
 
 	insertQuery := `
-    INSERT INTO count (count, capacity, last_update)
-    VALUES (?, ?, ?)`
-	_, err = s.db.Exec(insertQuery, counter.Count, counter.Capacity, counter.LastUpdate.Format(time.RFC3339))
+	INSERT INTO counter (gym, count, capacity, last_update)
+	VALUES (?, ?, ?, ?)`
+	_, err = s.db.Exec(insertQuery, s.gym, counter.Count, counter.Capacity, counter.LastUpdate.Format(time.RFC3339))
 	if err != nil {
 		return err
 	}
@@ -101,13 +98,13 @@ func (s *Storage) Store(counter Counter) error {
 	return nil
 }
 
-// Last returns the last stored Counter and a boolean indicating if it was successful
+// Last returns the last stored Counter.
 func (s *Storage) Last() (Counter, bool) {
-	logger := slog.Default().With("component", "storage", "function", "last")
+	logger := slog.Default().With("component", "storage", "function", "last", "gym", s.gym)
 
 	var counter Counter
-	query := "SELECT count, capacity, last_update FROM count ORDER BY id DESC LIMIT 1"
-	row := s.db.QueryRow(query)
+	query := "SELECT count, capacity, last_update FROM counter WHERE gym = ? ORDER BY id DESC LIMIT 1"
+	row := s.db.QueryRow(query, s.gym)
 
 	var lastUpdate string
 	if err := row.Scan(&counter.Count, &counter.Capacity, &lastUpdate); err != nil {

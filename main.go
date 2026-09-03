@@ -31,10 +31,20 @@ func main() {
 		log.Fatal(err)
 	}
 
+	db, err := OpenDB(cfg.Storage)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			slog.Error("close db", "msg", err)
+		}
+	}()
+
 	// Build one Storage (and Gym) per gym found in the scraped counters.
 	storers := make(map[string]Storer)
 	for gymKey := range *counters {
-		st, err := NewStorage(cfg.Storage, gymKey)
+		st, err := NewStorage(db, gymKey)
 		if err != nil {
 			log.Fatalf("create storage for gym %q: %v", gymKey, err)
 		}
@@ -50,7 +60,7 @@ func main() {
 
 	reg := prometheus.NewRegistry()
 	metrics := NewMetrics(reg)
-	jh := NewJobHandler(cfg.Storage, client, storers, metrics)
+	jh := NewJobHandler(client, storers, metrics)
 	bh := NewBotHandler(cfg.Gym, storers, metrics)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
