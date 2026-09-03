@@ -50,14 +50,6 @@ description = "Build and run the app"
 depends = ["build"]
 run = "./climber-count"
 
-[tasks.image]
-description = "Build linux/arm64 Docker image"
-env = { GOOS = "linux", GOARCH = "arm64" }
-run = [
-  "go build -o climber-count ./...",
-  "docker buildx build -t ghcr.io/eiri/climber-count:latest . --platform=linux/arm64",
-]
-
 [tasks.docker-up]
 description = "Start Docker Compose services"
 run = "docker compose up -d"
