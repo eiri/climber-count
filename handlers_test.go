@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -18,19 +18,14 @@ import (
 )
 
 type stubStorer struct {
-	stored  []Counter
-	gym     *Gym
-	gymPath string
+	stored []Counter
+	db     *sql.DB
+	gym    *Gym
 }
 
 func newStubStorer(t *testing.T) *stubStorer {
 	t.Helper()
-	f, err := os.CreateTemp(t.TempDir(), "gym-*.sqlite")
-	if err != nil {
-		t.Fatalf("newStubStorer: %v", err)
-	}
-	f.Close()
-	return &stubStorer{gymPath: f.Name()}
+	return &stubStorer{db: newTestDB(t)}
 }
 
 func (s *stubStorer) Store(c Counter) error { s.stored = append(s.stored, c); return nil }
@@ -42,7 +37,7 @@ func (s *stubStorer) Last() (Counter, bool) {
 }
 func (s *stubStorer) NewGym() error {
 	var err error
-	s.gym, err = NewGym(s.gymPath)
+	s.gym, err = NewGym(s.db, "TST")
 	return err
 }
 func (s *stubStorer) GetGym() *Gym { return s.gym }
@@ -55,7 +50,7 @@ func (e *errStorer) Store(_ Counter) error { return errors.New("store failed") }
 func TestNewJobHandler(t *testing.T) {
 	cfg := &Config{PGK: "pgk", FID: "fid"}
 	storers := map[string]Storer{"TST": newStubStorer(t)}
-	jh := NewJobHandler(t.TempDir(), NewClient(cfg), storers)
+	jh := NewJobHandler(NewClient(cfg), storers)
 	if jh == nil {
 		t.Fatal("expected non-nil JobHandler")
 	}
@@ -70,7 +65,7 @@ func TestJobHandler_Description(t *testing.T) {
 		"TST": newStubStorer(t),
 		"SLB": newStubStorer(t),
 	}
-	jh := NewJobHandler(t.TempDir(), NewClient(cfg), storers)
+	jh := NewJobHandler(NewClient(cfg), storers)
 	got := jh.Description()
 	want := "Climber Count Job for 2 gym(s)"
 	if got != want {
@@ -91,7 +86,7 @@ func TestJobHandler_Execute_Success(t *testing.T) {
 
 	st := newStubStorer(t)
 	storers := map[string]Storer{"TST": st}
-	jh := NewJobHandler(t.TempDir(), c, storers)
+	jh := NewJobHandler(c, storers)
 
 	if err := jh.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -122,7 +117,7 @@ func TestJobHandler_Execute_MultipleGyms(t *testing.T) {
 		"TST": stTST,
 		"SLB": stSLB,
 	}
-	jh := NewJobHandler(t.TempDir(), c, storers)
+	jh := NewJobHandler(c, storers)
 
 	if err := jh.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -147,7 +142,7 @@ func TestJobHandler_Execute_Metrics(t *testing.T) {
 	}
 	m := NewMetrics(prometheus.NewRegistry())
 	storers := map[string]Storer{"TST": newStubStorer(t)}
-	jh := NewJobHandler(t.TempDir(), c, storers, m)
+	jh := NewJobHandler(c, storers, m)
 
 	if err := jh.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -172,7 +167,7 @@ func TestJobHandler_Execute_FetchError(t *testing.T) {
 	c := NewClient(cfg)
 	c.client = &MockClient{err: errors.New("network down")}
 	storers := map[string]Storer{"TST": newStubStorer(t)}
-	jh := NewJobHandler(t.TempDir(), c, storers)
+	jh := NewJobHandler(c, storers)
 	if err := jh.Execute(context.Background()); err == nil {
 		t.Fatal("expected error when fetch fails")
 	}
@@ -184,7 +179,7 @@ func TestJobHandler_Execute_FetchErrorMetric(t *testing.T) {
 	c.client = &MockClient{err: errors.New("network down")}
 	m := NewMetrics(prometheus.NewRegistry())
 	storers := map[string]Storer{"TST": newStubStorer(t)}
-	jh := NewJobHandler(t.TempDir(), c, storers, m)
+	jh := NewJobHandler(c, storers, m)
 
 	if err := jh.Execute(context.Background()); err == nil {
 		t.Fatal("expected error when fetch fails")
@@ -205,7 +200,7 @@ func TestJobHandler_Execute_StoreError(t *testing.T) {
 		},
 	}
 	storers := map[string]Storer{"TST": &errStorer{}}
-	jh := NewJobHandler(t.TempDir(), c, storers)
+	jh := NewJobHandler(c, storers)
 	if err := jh.Execute(context.Background()); err == nil {
 		t.Fatal("expected error when storage fails")
 	}

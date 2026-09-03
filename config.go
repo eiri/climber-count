@@ -18,6 +18,7 @@ type Config struct {
 
 func NewConfig() (*Config, error) {
 	cfg := Config{
+		Storage:  "sqlite://data/storage.db",
 		Schedule: make(map[string]string),
 	}
 	envVars := map[string]*string{
@@ -33,7 +34,9 @@ func NewConfig() (*Config, error) {
 		if key != "STORAGE" && !ok {
 			return &cfg, fmt.Errorf("the required env var %q is not set", key)
 		}
-		*ptr = val
+		if ok {
+			*ptr = val
+		}
 	}
 
 	cfg.MetricsAddr = ":9117"

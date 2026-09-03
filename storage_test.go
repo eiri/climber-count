@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
@@ -11,8 +10,23 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+func newTestDB(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close db: %v", err)
+		}
+	})
+	return db
+}
+
 func readAllRecords(db *sql.DB) ([][]string, error) {
-	rows, err := db.Query("SELECT count, capacity, last_update FROM count")
+	rows, err := db.Query("SELECT gym, count, capacity, last_update FROM counter ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -20,70 +34,52 @@ func readAllRecords(db *sql.DB) ([][]string, error) {
 
 	var records [][]string
 	for rows.Next() {
+		var gym, lastUpdate string
 		var count, capacity int
-		var lastUpdate string
-		if err := rows.Scan(&count, &capacity, &lastUpdate); err != nil {
+		if err := rows.Scan(&gym, &count, &capacity, &lastUpdate); err != nil {
 			return nil, err
 		}
-		records = append(records, []string{strconv.Itoa(count), strconv.Itoa(capacity), lastUpdate})
+		records = append(records, []string{gym, strconv.Itoa(count), strconv.Itoa(capacity), lastUpdate})
 	}
 	return records, nil
 }
 
 func TestNewStorage(t *testing.T) {
-	dir := t.TempDir()
-	st, err := NewStorage(dir, "TST")
+	st, err := NewStorage(newTestDB(t), "TST")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if st == nil {
 		t.Fatal("expected non-nil Storage instance")
 	}
-	want := filepath.Join(dir, "tst.db")
-	if st.filePath != want {
-		t.Errorf("expected filePath %q, got %q", want, st.filePath)
+	if st.gym != "TST" {
+		t.Errorf("expected gym TST, got %q", st.gym)
 	}
 }
 
-func TestNewStorage_CreatesDir(t *testing.T) {
-	base := t.TempDir()
-	dir := filepath.Join(base, "sub", "storage")
-	st, err := NewStorage(dir, "TSB")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if st == nil {
-		t.Fatal("expected non-nil Storage instance")
-	}
-	want := filepath.Join(dir, "tsb.db")
-	if st.filePath != want {
-		t.Errorf("expected filePath %q, got %q", want, st.filePath)
-	}
-}
-
-func TestNewStorage_GymNameLowercased(t *testing.T) {
-	dir := t.TempDir()
+func TestNewStorage_GymNameUppercased(t *testing.T) {
 	cases := []struct {
 		gym  string
 		want string
 	}{
-		{"SLB", "slb.db"},
-		{"sbg", "sbg.db"},
-		{"MiXeD", "mixed.db"},
+		{"SLB", "SLB"},
+		{"sbg", "SBG"},
+		{"MiXeD", "MIXED"},
 	}
 	for _, tc := range cases {
-		st, err := NewStorage(dir, tc.gym)
+		st, err := NewStorage(newTestDB(t), tc.gym)
 		if err != nil {
 			t.Fatalf("gym %q: unexpected error: %v", tc.gym, err)
 		}
-		if got := filepath.Base(st.filePath); got != tc.want {
-			t.Errorf("gym %q: expected file %q, got %q", tc.gym, tc.want, got)
+		if st.gym != tc.want {
+			t.Errorf("gym %q: expected %q, got %q", tc.gym, tc.want, st.gym)
 		}
 	}
 }
 
 func TestStore(t *testing.T) {
-	st, err := NewStorage(t.TempDir(), "TST")
+	db := newTestDB(t)
+	st, err := NewStorage(db, "TST")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -99,40 +95,26 @@ func TestStore(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	records, err := readAllRecords(st.db)
+	records, err := readAllRecords(db)
 	if err != nil {
 		t.Fatalf("unexpected error reading records: %v", err)
 	}
 
-	expectedRecords := [][]string{
-		{"1", "100", "2024-05-30T10:00:00Z"},
-	}
+	expectedRecords := [][]string{{"TST", "1", "100", "2024-05-30T10:00:00Z"}}
 	if !reflect.DeepEqual(records, expectedRecords) {
 		t.Errorf("expected records %v but got %v", expectedRecords, records)
 	}
 }
 
 func TestStore_Append(t *testing.T) {
-	st, err := NewStorage(t.TempDir(), "TST")
+	st, err := NewStorage(newTestDB(t), "TST")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	counters := []Counter{
-		{
-			Count:    1,
-			Capacity: 100,
-			LastUpdate: LastUpdate{
-				Time: time.Date(2024, time.May, 30, 10, 0, 0, 0, time.UTC),
-			},
-		},
-		{
-			Count:    2,
-			Capacity: 200,
-			LastUpdate: LastUpdate{
-				Time: time.Date(2024, time.June, 1, 10, 0, 0, 0, time.UTC),
-			},
-		},
+		{Count: 1, Capacity: 100, LastUpdate: LastUpdate{Time: time.Date(2024, time.May, 30, 10, 0, 0, 0, time.UTC)}},
+		{Count: 2, Capacity: 200, LastUpdate: LastUpdate{Time: time.Date(2024, time.June, 1, 10, 0, 0, 0, time.UTC)}},
 	}
 	for _, counter := range counters {
 		if err := st.Store(counter); err != nil {
@@ -140,40 +122,23 @@ func TestStore_Append(t *testing.T) {
 		}
 	}
 
-	records, err := readAllRecords(st.db)
-	if err != nil {
-		t.Fatalf("unexpected error reading records: %v", err)
+	lastCounter, ok := st.Last()
+	if !ok {
+		t.Fatal("expected last counter to be found")
 	}
-
-	expectedRecords := [][]string{
-		{"1", "100", "2024-05-30T10:00:00Z"},
-		{"2", "200", "2024-06-01T10:00:00Z"},
-	}
-	if !reflect.DeepEqual(records, expectedRecords) {
-		t.Errorf("expected records %v but got %v", expectedRecords, records)
+	if !reflect.DeepEqual(lastCounter, counters[1]) {
+		t.Errorf("expected last counter %v but got %v", counters[1], lastCounter)
 	}
 }
 
 func TestLast(t *testing.T) {
-	st, err := NewStorage(t.TempDir(), "TST")
+	st, err := NewStorage(newTestDB(t), "TST")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	counter1 := Counter{
-		Count:    1,
-		Capacity: 100,
-		LastUpdate: LastUpdate{
-			Time: time.Date(2024, time.May, 30, 10, 0, 0, 0, time.UTC),
-		},
-	}
-	counter2 := Counter{
-		Count:    2,
-		Capacity: 200,
-		LastUpdate: LastUpdate{
-			Time: time.Date(2024, time.June, 1, 10, 0, 0, 0, time.UTC),
-		},
-	}
+	counter1 := Counter{Count: 1, Capacity: 100, LastUpdate: LastUpdate{Time: time.Date(2024, time.May, 30, 10, 0, 0, 0, time.UTC)}}
+	counter2 := Counter{Count: 2, Capacity: 200, LastUpdate: LastUpdate{Time: time.Date(2024, time.June, 1, 10, 0, 0, 0, time.UTC)}}
 
 	if err := st.Store(counter1); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -192,7 +157,7 @@ func TestLast(t *testing.T) {
 }
 
 func TestLast_EmptyStorage(t *testing.T) {
-	st, err := NewStorage(t.TempDir(), "TST")
+	st, err := NewStorage(newTestDB(t), "TST")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -204,7 +169,7 @@ func TestLast_EmptyStorage(t *testing.T) {
 }
 
 func TestGetGym_BeforeNewGym(t *testing.T) {
-	st, err := NewStorage(t.TempDir(), "TST")
+	st, err := NewStorage(newTestDB(t), "TST")
 	if err != nil {
 		t.Fatalf("NewStorage: %v", err)
 	}
@@ -214,7 +179,7 @@ func TestGetGym_BeforeNewGym(t *testing.T) {
 }
 
 func TestGetGym_AfterNewGym(t *testing.T) {
-	st, err := NewStorage(t.TempDir(), "TST")
+	st, err := NewStorage(newTestDB(t), "TST")
 	if err != nil {
 		t.Fatalf("NewStorage: %v", err)
 	}
@@ -226,16 +191,14 @@ func TestGetGym_AfterNewGym(t *testing.T) {
 	}
 }
 
-// TestMultipleGyms verifies that two gyms stored under the same dir
-// produce separate files and independent data.
 func TestMultipleGyms(t *testing.T) {
-	dir := t.TempDir()
+	db := newTestDB(t)
 
-	stSLB, err := NewStorage(dir, "SLB")
+	stSLB, err := NewStorage(db, "SLB")
 	if err != nil {
 		t.Fatalf("SLB storage: %v", err)
 	}
-	stSBG, err := NewStorage(dir, "SBG")
+	stSBG, err := NewStorage(db, "SBG")
 	if err != nil {
 		t.Fatalf("SBG storage: %v", err)
 	}
@@ -257,10 +220,5 @@ func TestMultipleGyms(t *testing.T) {
 	gotSBG, ok := stSBG.Last()
 	if !ok || gotSBG.Count != 99 {
 		t.Errorf("SBG: expected count 99, got %+v (ok=%v)", gotSBG, ok)
-	}
-
-	// Confirm two separate files exist.
-	if stSLB.filePath == stSBG.filePath {
-		t.Error("SLB and SBG share the same file path")
 	}
 }

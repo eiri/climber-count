@@ -126,8 +126,8 @@ func TestNewConfig_OptionalVarNotSet(t *testing.T) {
 	if cfg.BotToken != envVars["BOT_TOKEN"] {
 		t.Errorf("expected BOT_TOKEN %q, got %q", envVars["BOT_TOKEN"], cfg.BotToken)
 	}
-	if cfg.Storage != "" {
-		t.Errorf("expected STORAGE to be empty, got %q", cfg.Storage)
+	if cfg.Storage != "sqlite://data/storage.db" {
+		t.Errorf("expected STORAGE default, got %q", cfg.Storage)
 	}
 }
 

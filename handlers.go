@@ -14,17 +14,15 @@ import (
 )
 
 type JobHandler struct {
-	storageDir string
-	client     *Client
-	storers    map[string]Storer
-	metrics    *Metrics
+	client  *Client
+	storers map[string]Storer
+	metrics *Metrics
 }
 
-func NewJobHandler(storageDir string, client *Client, storers map[string]Storer, metrics ...*Metrics) *JobHandler {
+func NewJobHandler(client *Client, storers map[string]Storer, metrics ...*Metrics) *JobHandler {
 	jh := &JobHandler{
-		storageDir: storageDir,
-		client:     client,
-		storers:    storers,
+		client:  client,
+		storers: storers,
 	}
 	if len(metrics) > 0 {
 		jh.metrics = metrics[0]

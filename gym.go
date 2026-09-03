@@ -3,36 +3,36 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
-
-	_ "modernc.org/sqlite"
 )
 
-// Gym represents the gym structure with a connection to the SQLite database.
+// Gym represents one gym's visit log.
 type Gym struct {
-	db *sql.DB
+	db  *sql.DB
+	gym string
 }
 
-// NewGym creates a new Gym instance with the given SQLite database path.
-func NewGym(dbPath string) (*Gym, error) {
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return nil, err
+// NewGym creates a new Gym instance with the shared database.
+func NewGym(db *sql.DB, gymName string) (*Gym, error) {
+	queries := []string{
+		`CREATE TABLE IF NOT EXISTS visit (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			gym TEXT NOT NULL,
+			timestamp TEXT,
+			action TEXT
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_visit_gym_timestamp ON visit(gym, timestamp, id);`,
 	}
 
-	// Create table if it doesn't exist
-	createTableQuery := `
-    CREATE TABLE IF NOT EXISTS gym (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp TEXT,
-        action TEXT
-    );`
-	_, err = db.Exec(createTableQuery)
-	if err != nil {
-		return nil, err
+	for _, query := range queries {
+		if _, err := db.Exec(query); err != nil {
+			return nil, fmt.Errorf("init visit schema: %w", err)
+		}
 	}
 
-	return &Gym{db: db}, nil
+	return &Gym{db: db, gym: strings.ToUpper(gymName)}, nil
 }
 
 // In writes an "in" action with the current timestamp to the database.
@@ -72,7 +72,8 @@ func (g *Gym) Out() (time.Time, error) {
 
 func (g *Gym) lastAction() (string, time.Time, error) {
 	var action, timestampStr string
-	err := g.db.QueryRow("SELECT action, timestamp FROM gym ORDER BY timestamp DESC, id DESC LIMIT 1").Scan(&action, &timestampStr)
+	query := "SELECT action, timestamp FROM visit WHERE gym = ? ORDER BY timestamp DESC, id DESC LIMIT 1"
+	err := g.db.QueryRow(query, g.gym).Scan(&action, &timestampStr)
 	if err == sql.ErrNoRows {
 		return "", time.Time{}, nil
 	}
@@ -90,6 +91,6 @@ func (g *Gym) lastAction() (string, time.Time, error) {
 
 func (g *Gym) writeAction(action string) error {
 	timestamp := time.Now().Format(time.RFC3339)
-	_, err := g.db.Exec("INSERT INTO gym (timestamp, action) VALUES (?, ?)", timestamp, action)
+	_, err := g.db.Exec("INSERT INTO visit (gym, timestamp, action) VALUES (?, ?, ?)", g.gym, timestamp, action)
 	return err
 }

@@ -6,4 +6,5 @@
 /climber-count
 dist/
 storage/
+data/
 cog.toml
