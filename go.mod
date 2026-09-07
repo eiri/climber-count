@@ -3,7 +3,7 @@ module github.com/eiri/climber-count
 go 1.25.0
 
 require (
-	github.com/go-telegram/bot v1.24.0
+	github.com/go-telegram/bot v1.25.0
 	github.com/imbue11235/humanize v1.0.2
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/client_model v0.6.3
