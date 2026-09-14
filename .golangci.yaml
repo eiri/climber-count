@@ -4,9 +4,9 @@ linters:
 
   settings:
     staticcheck:
-        checks:
-            - all
-            - '-ST1003'
+      checks:
+        - all
+        - "-ST1003"
 
     errcheck:
       exclude-functions:
