@@ -1,6 +1,6 @@
 module github.com/eiri/climber-count
 
-go 1.25.0
+go 1.26.8
 
 require (
 	github.com/go-telegram/bot v1.27.0
