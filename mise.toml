@@ -51,14 +51,22 @@ description = "Build and run the app"
 depends = ["build"]
 run = "./climber-count"
 
-[tasks.docker-up]
+[tasks.start]
 description = "Start Docker Compose services"
 run = "docker compose up -d"
 
-[tasks.docker-down]
+[tasks.start-dev]
+description = "Build and start local Docker image"
+run = "docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d --build"
+
+[tasks.stop]
 description = "Stop Docker Compose services"
 run = "docker compose down"
 
-[tasks.docker-logs]
+[tasks.logs]
 description = "Show Docker Compose logs"
 run = "docker compose logs"
+
+[tasks.top]
+description = "Show Docker Compose top"
+run = "docker compose top"

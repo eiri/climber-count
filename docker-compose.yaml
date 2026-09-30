@@ -1,8 +1,9 @@
 services:
   climber-count:
-    build:
-      context: .
-    image: climber-count:local
+    # build:
+    #   context: .
+    # image: climber-count:local
+    image: ghcr.io/eiri/climber-count:0.1.15
     env_file: ".env"
     ports:
       - "9117:9117"

@@ -1,0 +1,4 @@
+services:
+  climber-count:
+    build: .
+    image: climber-count:local
