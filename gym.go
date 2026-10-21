@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 )
@@ -14,24 +13,8 @@ type Gym struct {
 	gym string
 }
 
-// NewGym creates a new Gym instance with the shared database.
+// NewGym creates a visit log for a database initialized by OpenDB.
 func NewGym(db *sql.DB, gymName string) (*Gym, error) {
-	queries := []string{
-		`CREATE TABLE IF NOT EXISTS visit (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			gym TEXT NOT NULL,
-			timestamp TEXT,
-			action TEXT
-		);`,
-		`CREATE INDEX IF NOT EXISTS idx_visit_gym_timestamp ON visit(gym, timestamp, id);`,
-	}
-
-	for _, query := range queries {
-		if _, err := db.Exec(query); err != nil {
-			return nil, fmt.Errorf("init visit schema: %w", err)
-		}
-	}
-
 	return &Gym{db: db, gym: strings.ToUpper(gymName)}, nil
 }
 
@@ -72,7 +55,7 @@ func (g *Gym) Out() (time.Time, error) {
 
 func (g *Gym) lastAction() (string, time.Time, error) {
 	var action, timestampStr string
-	query := "SELECT action, timestamp FROM visit WHERE gym = ? ORDER BY timestamp DESC, id DESC LIMIT 1"
+	query := "SELECT action, timestamp FROM visit WHERE gym = $1 ORDER BY timestamp DESC, id DESC LIMIT 1"
 	err := g.db.QueryRow(query, g.gym).Scan(&action, &timestampStr)
 	if err == sql.ErrNoRows {
 		return "", time.Time{}, nil
@@ -91,6 +74,6 @@ func (g *Gym) lastAction() (string, time.Time, error) {
 
 func (g *Gym) writeAction(action string) error {
 	timestamp := time.Now().Format(time.RFC3339)
-	_, err := g.db.Exec("INSERT INTO visit (gym, timestamp, action) VALUES (?, ?, ?)", g.gym, timestamp, action)
+	_, err := g.db.Exec("INSERT INTO visit (gym, timestamp, action) VALUES ($1, $2, $3)", g.gym, timestamp, action)
 	return err
 }

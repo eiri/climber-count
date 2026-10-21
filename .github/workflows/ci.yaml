@@ -31,6 +31,20 @@ jobs:
     strategy:
       matrix:
         go: ["1.26", "1.27"]
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: climber
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: climber_count_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U climber -d climber_count_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout repo
         uses: actions/checkout@v7
@@ -39,7 +53,11 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
           check-latest: true
-      - name: Run tests
+      - name: Run SQLite tests
+        run: go test -v ./...
+      - name: Run PostgreSQL tests
+        env:
+          TEST_POSTGRES_URL: postgres://climber:test@localhost:5432/climber_count_test?sslmode=disable
         run: go test -v ./...
 
   lint:
