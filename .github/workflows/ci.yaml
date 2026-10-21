@@ -16,10 +16,10 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v7
-      - name: Setup go 1.26
+      - name: Setup go 1.27
         uses: actions/setup-go@v7
         with:
-          go-version: "1.26"
+          go-version: "1.27"
           check-latest: true
       - name: Run govulncheck
         run: |
@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ["1.26", "1.27"]
+        go: ["1.27"]
     services:
       postgres:
         image: postgres:18
@@ -65,15 +65,15 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v7
-      - name: Setup go 1.26
+      - name: Setup go 1.27
         uses: actions/setup-go@v7
         with:
-          go-version: "1.26"
+          go-version: "1.27"
           check-latest: true
       - name: Run linters
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.10
+          version: v2.15
 
   automerge:
     needs: [govulncheck, test, lint]

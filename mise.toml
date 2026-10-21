@@ -1,6 +1,6 @@
 [tools]
-go = "1.26"
-golangci-lint = "2.10"
+go = "1.27"
+golangci-lint = "2.15"
 
 [env]
 CGO_ENABLED = "0"
@@ -17,6 +17,17 @@ run = "go test ./..."
 [tasks.lint]
 description = "Run golangci-lint"
 run = "golangci-lint run ./..."
+
+[tasks.gopls]
+description = "Check gopls diagnostics, including hints"
+run = '''
+# gopls exits successfully even when it reports diagnostics.
+diagnostics="$(go tool gopls check -severity=hint ./*.go)" || exit $?
+if [ -n "$diagnostics" ]; then
+  printf '%s\n' "$diagnostics"
+  exit 1
+fi
+'''
 
 [tasks.fmt-check]
 description = "Check gofmt"
@@ -40,6 +51,7 @@ run = [
   "mise run build",
   "mise run test",
   "mise run lint",
+  "mise run gopls",
 ]
 
 [tasks.clean]

@@ -21,10 +21,10 @@ jobs:
           fetch-depth: 0
       - name: Fetch tags
         run: git fetch --force --tags
-      - name: Setup go 1.26
+      - name: Setup go 1.27
         uses: actions/setup-go@v7
         with:
-          go-version: 1.26
+          go-version: "1.27"
           check-latest: true
           cache: true
       - name: Set up QEMU
