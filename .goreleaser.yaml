@@ -67,27 +67,9 @@ snapshot:
   version_template: "{{ incpatch .Version }}-rc"
 release:
   prerelease: auto
+  mode: keep-existing
 changelog:
-  sort: asc
-  use: github
-  filters:
-    exclude:
-      - "^docs:"
-      - "^chore:"
-      - "^test:"
-      - "^ci:"
-  groups:
-    - title: Features
-      regexp: "^.*feat[(\\w)]*:+.*$"
-      order: 0
-    - title: "Bug fixes"
-      regexp: "^.*fix[(\\w)]*:+.*$"
-      order: 1
-    - title: "Refactorings"
-      regexp: "^.*refactor[(\\w)]*:+.*$"
-      order: 2
-    - title: Others
-      order: 999
+  disable: true
 homebrew_casks:
   - name: climber-count
     custom_block: |
