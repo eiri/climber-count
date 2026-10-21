@@ -20,8 +20,7 @@ func OpenDB(rawURL string) (*sql.DB, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		// url.Error includes the input URL, which can contain credentials.
-		var urlErr *url.Error
-		if errors.As(err, &urlErr) {
+		if urlErr, ok := errors.AsType[*url.Error](err); ok {
 			err = urlErr.Err
 		}
 		return nil, fmt.Errorf("parse storage url: %w", err)

@@ -345,9 +345,15 @@ func multiGymOccupancyHTML(gyms map[string][2]int) string {
 	var sb strings.Builder
 	sb.WriteString("<!DOCTYPE html><html><body><script>\nvar data = {\n")
 	for key, vals := range gyms {
-		sb.WriteString("'" + key + "' : {")
-		sb.WriteString("'capacity' : " + itoa(vals[1]) + ",")
-		sb.WriteString("'count' : " + itoa(vals[0]) + ",")
+		sb.WriteString("'")
+		sb.WriteString(key)
+		sb.WriteString("' : {")
+		sb.WriteString("'capacity' : ")
+		sb.WriteString(itoa(vals[1]))
+		sb.WriteString(",")
+		sb.WriteString("'count' : ")
+		sb.WriteString(itoa(vals[0]))
+		sb.WriteString(",")
 		sb.WriteString("'subLabel' : 'Current climber count',")
 		sb.WriteString("'lastUpdate' : 'Last updated:&nbspnow (10:00 AM)'")
 		sb.WriteString("},\n")
