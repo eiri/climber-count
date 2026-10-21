@@ -1,8 +1,10 @@
 package main
 
 import (
+	"net"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -25,9 +27,43 @@ func TestOpenDB_SQLiteURL(t *testing.T) {
 }
 
 func TestOpenDB_UnsupportedScheme(t *testing.T) {
-	_, err := OpenDB("postgres://localhost/db")
+	_, err := OpenDB("mysql://localhost/db")
 	if err == nil {
 		t.Fatal("expected unsupported scheme error")
+	}
+}
+
+func TestOpenDB_InvalidURL(t *testing.T) {
+	for _, rawURL := range []string{
+		"postgres://user:secret@localhost:bad/db",
+		"postgres://user:secret@localhost/db?sslmode=invalid",
+	} {
+		db, err := OpenDB(rawURL)
+		if db != nil || err == nil {
+			t.Fatalf("expected nil database and an error, got %v, %v", db, err)
+		}
+		if strings.Contains(err.Error(), "secret") {
+			t.Fatal("error exposes database password")
+		}
+	}
+}
+
+func TestOpenDB_Unavailable(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := listener.Addr().String()
+	if err := listener.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := OpenDB("postgres://user:secret@" + addr + "/db?sslmode=disable&connect_timeout=1")
+	if db != nil || err == nil {
+		t.Fatalf("expected nil database and an error, got %v, %v", db, err)
+	}
+	if !strings.Contains(err.Error(), "ping storage") || strings.Contains(err.Error(), "secret") {
+		t.Fatalf("unexpected connection error: %v", err)
 	}
 }
 

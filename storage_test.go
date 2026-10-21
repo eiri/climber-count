@@ -1,18 +1,21 @@
 package main
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
 	"time"
-
-	_ "modernc.org/sqlite"
 )
 
 func newTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := sql.Open("sqlite", ":memory:")
+	db, err := OpenDB(testDBURL(t))
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
@@ -23,6 +26,44 @@ func newTestDB(t *testing.T) *sql.DB {
 		}
 	})
 	return db
+}
+
+// testDBURL isolates each test from other tests and existing database tables.
+func testDBURL(t *testing.T) string {
+	t.Helper()
+	rawURL := os.Getenv("TEST_POSTGRES_URL")
+	if rawURL == "" {
+		return "sqlite://" + filepath.Join(t.TempDir(), "storage.db")
+	}
+
+	admin, err := sql.Open("pgx", rawURL)
+	if err != nil {
+		t.Fatalf("open test postgres: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := admin.Close(); err != nil {
+			t.Errorf("close test postgres: %v", err)
+		}
+	})
+
+	schema := fmt.Sprintf("test_%x", rand.Text())
+	if _, err := admin.Exec("CREATE SCHEMA " + schema); err != nil {
+		t.Fatalf("create test schema: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := admin.Exec("DROP SCHEMA " + schema + " CASCADE"); err != nil {
+			t.Errorf("drop test schema: %v", err)
+		}
+	})
+
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		t.Fatalf("parse test postgres url: %v", err)
+	}
+	query := u.Query()
+	query.Set("search_path", schema)
+	u.RawQuery = query.Encode()
+	return u.String()
 }
 
 func readAllRecords(db *sql.DB) ([][]string, error) {
@@ -41,7 +82,7 @@ func readAllRecords(db *sql.DB) ([][]string, error) {
 		}
 		records = append(records, []string{gym, strconv.Itoa(count), strconv.Itoa(capacity), lastUpdate})
 	}
-	return records, nil
+	return records, rows.Err()
 }
 
 func TestNewStorage(t *testing.T) {

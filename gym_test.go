@@ -161,7 +161,7 @@ func TestOut_EntryTime(t *testing.T) {
 	}
 
 	inTime := time.Now().Add(-2 * time.Second).Format(time.RFC3339)
-	_, err = db.Exec("INSERT INTO visit (gym, timestamp, action) VALUES (?, ?, ?)", "TST", inTime, "in")
+	_, err = db.Exec("INSERT INTO visit (gym, timestamp, action) VALUES ($1, $2, $3)", "TST", inTime, "in")
 	if err != nil {
 		t.Fatalf("unexpected error seeding 'in' row: %v", err)
 	}

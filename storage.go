@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -23,33 +22,9 @@ type Storage struct {
 	log *Gym
 }
 
-// NewStorage creates a storage wrapper for the given gym.
+// NewStorage creates a storage wrapper for a database initialized by OpenDB.
 func NewStorage(db *sql.DB, gymName string) (*Storage, error) {
-	if err := initStorage(db); err != nil {
-		return nil, err
-	}
-
 	return &Storage{db: db, gym: strings.ToUpper(gymName)}, nil
-}
-
-func initStorage(db *sql.DB) error {
-	queries := []string{
-		`CREATE TABLE IF NOT EXISTS counter (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			gym TEXT NOT NULL,
-			count INTEGER,
-			capacity INTEGER,
-			last_update TEXT
-		);`,
-		`CREATE INDEX IF NOT EXISTS idx_counter_gym_id ON counter(gym, id);`,
-	}
-
-	for _, query := range queries {
-		if _, err := db.Exec(query); err != nil {
-			return fmt.Errorf("init counter schema: %w", err)
-		}
-	}
-	return nil
 }
 
 // NewGym initializes and stores the Gym instance using the Storage's DB.
@@ -69,7 +44,7 @@ func (s *Storage) Store(counter Counter) error {
 	logger := slog.Default().With("component", "storage", "gym", s.gym)
 
 	var lastUpdate string
-	query := "SELECT last_update FROM counter WHERE gym = ? ORDER BY id DESC LIMIT 1"
+	query := "SELECT last_update FROM counter WHERE gym = $1 ORDER BY id DESC LIMIT 1"
 	err := s.db.QueryRow(query, s.gym).Scan(&lastUpdate)
 	if err != nil && err != sql.ErrNoRows {
 		return err
@@ -88,7 +63,7 @@ func (s *Storage) Store(counter Counter) error {
 
 	insertQuery := `
 	INSERT INTO counter (gym, count, capacity, last_update)
-	VALUES (?, ?, ?, ?)`
+	VALUES ($1, $2, $3, $4)`
 	_, err = s.db.Exec(insertQuery, s.gym, counter.Count, counter.Capacity, counter.LastUpdate.Format(time.RFC3339))
 	if err != nil {
 		return err
@@ -103,7 +78,7 @@ func (s *Storage) Last() (Counter, bool) {
 	logger := slog.Default().With("component", "storage", "function", "last", "gym", s.gym)
 
 	var counter Counter
-	query := "SELECT count, capacity, last_update FROM counter WHERE gym = ? ORDER BY id DESC LIMIT 1"
+	query := "SELECT count, capacity, last_update FROM counter WHERE gym = $1 ORDER BY id DESC LIMIT 1"
 	row := s.db.QueryRow(query, s.gym)
 
 	var lastUpdate string
