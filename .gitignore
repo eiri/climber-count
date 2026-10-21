@@ -1,5 +1,6 @@
 .DS_Store
 .env
+.postgres.env
 *.csv
 *.md
 !README.md
