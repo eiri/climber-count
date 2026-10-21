@@ -23,7 +23,7 @@ func readAllActions(db *sql.DB) ([][]string, error) {
 		}
 		actions = append(actions, []string{gym, timestamp, action})
 	}
-	return actions, nil
+	return actions, rows.Err()
 }
 
 func TestNewGym(t *testing.T) {
