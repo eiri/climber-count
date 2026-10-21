@@ -1,5 +1,7 @@
 climber-count
 dist/
 storage/
+data/
 .git/
 .env
+.postgres.env
