@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.17](https://github.com/eiri/climber-count/compare/v0.1.16...v0.1.17) (2026-10-26)
+
+
+### Bug Fixes
+
+* **ci:** homebrew template and token rename ([ac2f384](https://github.com/eiri/climber-count/commit/ac2f38445c87ee94c28ca7abe0409508b65d0271))
+
 ## [0.1.16](https://github.com/eiri/climber-count/compare/v0.1.15...v0.1.16) (2026-10-21)
 
 
