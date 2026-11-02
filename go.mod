@@ -9,7 +9,7 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
 	github.com/reugn/go-quartz v0.15.2
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	modernc.org/sqlite v1.61.0
 )
 
