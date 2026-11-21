@@ -23,7 +23,7 @@ jobs:
       - name: Fetch tags
         run: git fetch --force --tags
       - name: Setup go 1.27
-        uses: actions/setup-go@v7.0.0
+        uses: actions/setup-go@v7.1.0
         with:
           go-version: "1.27"
           check-latest: true
