@@ -3,14 +3,14 @@ module github.com/eiri/climber-count
 go 1.27.0
 
 require (
-	github.com/go-telegram/bot v1.29.0
+	github.com/go-telegram/bot v1.30.0
 	github.com/imbue11235/humanize v1.0.2
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/prometheus/client_golang v1.25.0
 	github.com/prometheus/client_model v0.6.3
 	github.com/reugn/go-quartz v0.15.2
 	golang.org/x/net v0.63.0
-	modernc.org/sqlite v1.62.0
+	modernc.org/sqlite v1.63.0
 )
 
 require (
